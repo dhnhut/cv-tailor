@@ -1,3 +1,12 @@
+# Agents
+CLAUDE.md
+
+# Project files
+.turbo/
+.vitest/
+*.local
+cdk.out/
+
 # Logs
 logs
 *.log
