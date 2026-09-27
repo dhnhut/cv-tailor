@@ -1,22 +1,22 @@
 # ADR-0001: Monorepo with pnpm Workspaces
 
-| Field | Value |
-| --- | --- |
-| Status | Accepted |
-| Date | 2026-09-27 |
-| Deciders | Project owner |
-| Sprint item | S0-02 |
+| Field       | Value         |
+| ----------- | ------------- |
+| Status      | Accepted      |
+| Date        | 2026-09-27    |
+| Deciders    | Project owner |
+| Sprint item | S0-02         |
 
 ## Context
 
 CV Tailor has four deployable or buildable parts, in two languages:
 
-| Part | Language | Tooling |
-| --- | --- | --- |
-| Web SPA (`apps/web`) | TypeScript | pnpm, Vite, Vitest |
-| API Lambdas (`apps/api`) | TypeScript | pnpm, Vitest |
+| Part                              | Language    | Tooling                |
+| --------------------------------- | ----------- | ---------------------- |
+| Web SPA (`apps/web`)              | TypeScript  | pnpm, Vite, Vitest     |
+| API Lambdas (`apps/api`)          | TypeScript  | pnpm, Vitest           |
 | Agent service (`services/agents`) | Python 3.12 | uv, pytest, ruff, mypy |
-| Infrastructure (`infra`) | TypeScript | pnpm, AWS CDK |
+| Infrastructure (`infra`)          | TypeScript  | pnpm, AWS CDK          |
 
 These parts are tightly coupled:
 
@@ -41,13 +41,13 @@ We need to decide how to organise the code into repositories, and how to run tas
 
 The project already uses pnpm 12 (pinned through Corepack). pnpm 12 covers most of what a separate monorepo task runner would add:
 
-| Capability | How pnpm provides it | Source |
-| --- | --- | --- |
-| Workspace packages | `pnpm-workspace.yaml` lists the package folders. | [Workspaces](https://pnpm.io/workspaces) |
-| Dependency-ordered runs | `pnpm -r run <script>` follows the workspace dependency graph by default, with a default concurrency of 4. | [pnpm -r](https://pnpm.io/cli/recursive) |
-| Task dependencies | A `tasks` block in `pnpm-workspace.yaml` declares `dependsOn`, for example `^build` (build dependencies first). | [Task orchestration](https://pnpm.io/workspace-task-orchestration) |
-| Changed packages only | `pnpm --filter "...[origin/main]" <script>` selects changed packages and their dependents. | [Filtering](https://pnpm.io/filtering) |
-| Task caching | Only through `pnpm pipeline` (added in v12.4.0, marked **experimental**). A plain `pnpm -r run` never uses the cache. | [pnpm pipeline](https://pnpm.io/cli/pipeline) |
+| Capability              | How pnpm provides it                                                                                                  | Source                                                             |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Workspace packages      | `pnpm-workspace.yaml` lists the package folders.                                                                      | [Workspaces](https://pnpm.io/workspaces)                           |
+| Dependency-ordered runs | `pnpm -r run <script>` follows the workspace dependency graph by default, with a default concurrency of 4.            | [pnpm -r](https://pnpm.io/cli/recursive)                           |
+| Task dependencies       | A `tasks` block in `pnpm-workspace.yaml` declares `dependsOn`, for example `^build` (build dependencies first).       | [Task orchestration](https://pnpm.io/workspace-task-orchestration) |
+| Changed packages only   | `pnpm --filter "...[origin/main]" <script>` selects changed packages and their dependents.                            | [Filtering](https://pnpm.io/filtering)                             |
+| Task caching            | Only through `pnpm pipeline` (added in v12.4.0, marked **experimental**). A plain `pnpm -r run` never uses the cache. | [pnpm pipeline](https://pnpm.io/cli/pipeline)                      |
 
 The contracts pipeline also does not need build ordering. The generated Zod and Pydantic files are committed into the packages that use them, so no package waits for a contracts build step. Only the CI drift check runs the generator.
 
@@ -155,9 +155,9 @@ Option B is chosen over:
 
 ### Risks and mitigations
 
-| Risk | Mitigation |
-| --- | --- |
-| pnpm has trouble running the Python wrapper. | CI runs the Python steps directly with uv. The wrapper can be removed without changing the rest of the layout. |
+| Risk                                                 | Mitigation                                                                                                         |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| pnpm has trouble running the Python wrapper.         | CI runs the Python steps directly with uv. The wrapper can be removed without changing the rest of the layout.     |
 | The pnpm 12 task features change in a later release. | pnpm is pinned through `packageManager` in the root `package.json`, so upgrades are deliberate and tested in a PR. |
 
 ### When to revisit this decision
