@@ -230,18 +230,19 @@ The system must resist abuse, such as someone creating many free accounts to col
 | Scale         | Low user volume (portfolio stage)                              |
 | Reliability   | Production-grade behaviour, with errors handled and observable |
 | Test coverage | 80% target                                                     |
-| Region focus  | New Zealand and Australia                                      |
+| User focus    | New Zealand and Australia, served from `us-east-1` (see §10)   |
 
 ---
 
 ## 10. Environments and Delivery
 
-| Item         | Decision                                                                      |
-| ------------ | ----------------------------------------------------------------------------- |
-| Environments | `dev`, `stag`, `prod`, each in a separate AWS account under AWS Organizations |
-| Deployment   | AWS CDK through GitHub Actions                                                |
-| Process      | Lightweight Agile/Scrum in small sprints                                      |
-| Sprint docs  | `docs/sprints/`                                                               |
+| Item         | Decision                                                                                    |
+| ------------ | ------------------------------------------------------------------------------------------- |
+| Environments | `dev`, `stag`, `prod`, each in a separate AWS account under AWS Organizations               |
+| Region       | Single region, `us-east-1`, for every environment ([ADR-0002](docs/adr/0002-aws-region.md)) |
+| Deployment   | AWS CDK through GitHub Actions                                                              |
+| Process      | Lightweight Agile/Scrum in small sprints                                                    |
+| Sprint docs  | `docs/sprints/`                                                                             |
 
 ---
 
