@@ -54,7 +54,7 @@ The options target Prettier 3 and change only `printWidth` (100) and `singleQuot
 | ---------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | TypeScript | `>=6.0.0 <6.1.0` | typescript-eslint 8.x supports TypeScript `<6.1.0`. TypeScript 7 (the native compiler) is not supported yet. Upgrade when typescript-eslint's peer range includes it. |
 | ESLint     | `^10.0.0`        | Flat config and `defineConfig` from `eslint/config`                                                                                                                   |
-| Node types | `@types/node` 22 | Matches the Lambda runtime and the root `engines` field (`>=22 <23`)                                                                                                  |
+| Node types | `@types/node` 24 | Matches the Lambda runtime and the root `engines` field (`>=24 <25`)                                                                                                  |
 
 ## Scripts
 

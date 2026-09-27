@@ -91,20 +91,20 @@ Sydney `au.` profiles: Haiku 4.5; Sonnet 4.5, 4.6, 5; Opus 4.6, 4.7, 4.8, 5, 5.5
 
 ### 3.3 Core services (AGENTS.md §7)
 
-| Service                           | Auckland | Sydney | us-east-1 | Evidence                                  |
-| --------------------------------- | -------- | ------ | --------- | ----------------------------------------- |
-| Cognito user pools                | ✅       | ✅     | ✅        | API, SSM                                  |
-| API Gateway REST                  | ✅       | ✅     | ✅        | API, SSM                                  |
-| API Gateway HTTP / WebSocket (v2) | ✅       | ✅     | ✅        | API (SSM misses Auckland, see §6)         |
-| Lambda (`nodejs22.x`)             | ✅       | ✅     | ✅        | API, SSM, Doc [5] (see §6 on deprecation) |
-| DynamoDB                          | ✅       | ✅     | ✅        | API, SSM                                  |
-| S3                                | ✅       | ✅     | ✅        | API, SSM                                  |
-| SQS                               | ✅       | ✅     | ✅        | API, SSM                                  |
-| Step Functions                    | ✅       | ✅     | ✅        | API, SSM                                  |
-| SSM Parameter Store               | ✅       | ✅     | ✅        | API, SSM                                  |
-| Secrets Manager                   | ✅       | ✅     | ✅        | API, SSM                                  |
-| Budgets                           | global   | global | global    | API (single endpoint in `us-east-1`)      |
-| CloudFront                        | global   | global | global    | API (global service)                      |
+| Service                           | Auckland | Sydney | us-east-1 | Evidence                             |
+| --------------------------------- | -------- | ------ | --------- | ------------------------------------ |
+| Cognito user pools                | ✅       | ✅     | ✅        | API, SSM                             |
+| API Gateway REST                  | ✅       | ✅     | ✅        | API, SSM                             |
+| API Gateway HTTP / WebSocket (v2) | ✅       | ✅     | ✅        | API (SSM misses Auckland, see §6)    |
+| Lambda (`nodejs24.x`)             | ✅       | ✅     | ✅        | API, SSM, Doc [5] (see §6)           |
+| DynamoDB                          | ✅       | ✅     | ✅        | API, SSM                             |
+| S3                                | ✅       | ✅     | ✅        | API, SSM                             |
+| SQS                               | ✅       | ✅     | ✅        | API, SSM                             |
+| Step Functions                    | ✅       | ✅     | ✅        | API, SSM                             |
+| SSM Parameter Store               | ✅       | ✅     | ✅        | API, SSM                             |
+| Secrets Manager                   | ✅       | ✅     | ✅        | API, SSM                             |
+| Budgets                           | global   | global | global    | API (single endpoint in `us-east-1`) |
+| CloudFront                        | global   | global | global    | API (global service)                 |
 
 ### 3.4 Vector store options (region and pricing notes only; the choice is made in a later sprint)
 
@@ -147,7 +147,7 @@ A legal assessment (for example, cross-border rules under the NZ Privacy Act 202
 ## 6. Other Findings
 
 1. **The SSM list lags behind.** It doesn't list `apigatewayv2` in Auckland, yet the API answers. This confirms the plan to treat SSM as a cross-check only.
-2. **Lambda Node.js 22 deprecates soon.** The Lambda runtime table [5] lists `nodejs22.x` with deprecation on **2027-04-30**, blocked creation on 2027-06-01, and blocked updates on 2027-07-01. `nodejs24.x` deprecates on 2028-04-30. AGENTS.md §7 currently says Node.js 22. This is not a region question, but it affects the backend runtime choice.
+2. **Lambda Node.js 22 deprecates soon (resolved).** The Lambda runtime table [5] lists `nodejs22.x` with deprecation on **2027-04-30**, blocked creation on 2027-06-01, and blocked updates on 2027-07-01. `nodejs24.x` deprecates on 2028-04-30. As a result, the backend moved from Node.js 22 to Node.js 24 (AGENTS.md §7).
 
 ---
 
