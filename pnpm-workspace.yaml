@@ -1,0 +1,15 @@
+packages:
+  - apps/*
+  - packages/*
+  - services/*
+  - infra
+
+tasks:
+  build:
+    dependsOn: ['^build']
+  typecheck:
+    dependsOn: ['^build']
+  test:
+    dependsOn: ['^build']
+  check:
+    dependsOn: [lint, typecheck, test, build]

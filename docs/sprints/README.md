@@ -12,12 +12,12 @@ This project uses a lightweight Agile/Scrum process, with small **1-week sprints
 
 Each step in a sprint's execution guide has an owner:
 
-| Owner | Meaning |
-| --- | --- |
-| **Me** | I do it by hand. It needs my accounts, a decision from me, or it's something new to me and I want to learn by doing. |
-| **Me + Claude** | Claude gives exact files and commands for this step, and I implement and verify them. |
-| **Claude** | Claude does it (research, drafting, time-consuming work), and I review before merging. |
-| **Claude drafts, Me decides** | Claude prepares options or a draft, and I make the decision. |
+| Owner                         | Meaning                                                                                                              |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| **Me**                        | I do it by hand. It needs my accounts, a decision from me, or it's something new to me and I want to learn by doing. |
+| **Me + Claude**               | Claude gives exact files and commands for this step, and I implement and verify them.                                |
+| **Claude**                    | Claude does it (research, drafting, time-consuming work), and I review before merging.                               |
+| **Claude drafts, Me decides** | Claude prepares options or a draft, and I make the decision.                                                         |
 
 Nothing is merged without my review. See `AGENTS.md` §1.
 
@@ -49,13 +49,13 @@ For every step:
 
 ## Backlog
 
-| ID | Item | Requirement IDs | Acceptance criteria |
-| --- | --- | --- | --- |
+| ID  | Item | Requirement IDs | Acceptance criteria |
+| --- | ---- | --------------- | ------------------- |
 
 ## Execution guide
 
-| # | Step | Item | Owner | How | Verify |
-| --- | --- | --- | --- | --- | --- |
+| #   | Step | Item | Owner | How | Verify |
+| --- | ---- | ---- | ----- | --- | ------ |
 
 ## Out of scope
 
