@@ -199,6 +199,7 @@ An **evaluation benchmark** is required. It measures output quality and checks t
 | Infrastructure as Code | AWS CDK |
 | CI/CD | GitHub Actions |
 | Package managers | pnpm (via Corepack) for TypeScript, uv for Python |
+| Repository | Monorepo: pnpm workspaces with pnpm's built-in task orchestration, plus a `package.json` wrapper so pnpm can run the Python service's tasks ([ADR-0001](docs/adr/0001-monorepo-pnpm-workspaces.md)) |
 | Secrets | SSM Parameter Store; Secrets Manager when needed |
 
 **Backend-to-agent communication:** synchronous for chat, asynchronous for long-running generation.
