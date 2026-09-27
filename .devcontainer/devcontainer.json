@@ -4,7 +4,7 @@
   "runArgs": ["--name", "cv-tailor"],
   "features": {
     "ghcr.io/devcontainers/features/node:1": {
-      "version": "22"
+      "version": "24"
     },
     "ghcr.io/devcontainers/features/python:1": {
       "version": "3.12"
@@ -12,7 +12,7 @@
     "ghcr.io/devcontainers/features/aws-cli:1": {},
     "ghcr.io/devcontainers/features/docker-in-docker:2": {}
   },
-  "mounts": ["source=${localEnv:HOME}/.aws,target=/home/vscode/.aws,type=bind,readonly"],
+  "mounts": ["source=${localEnv:HOME}/.aws,target=/home/vscode/.aws,type=bind,consistency=cached"],
   "remoteEnv": {
     "PATH": "${containerEnv:PATH}:/home/vscode/.local/bin"
   },
