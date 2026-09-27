@@ -1,7 +1,8 @@
 {
-  "files": [],
-  "references": [
-    { "path": "./tsconfig.app.json" },
-    { "path": "./tsconfig.node.json" }
-  ]
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@cv-tailor/config/tsconfig/react.json",
+  "compilerOptions": {
+    "types": ["vite/client"]
+  },
+  "include": ["src", "test", "vite.config.ts"]
 }
