@@ -1,0 +1,19 @@
+{
+  "name": "@cv-tailor/api",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@cv-tailor/config": "workspace:*",
+    "@types/aws-lambda": "^8.10.163",
+    "@types/node": "^24.19.0",
+    "eslint": "^10.11.0",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.2"
+  }
+}
