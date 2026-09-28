@@ -1,0 +1,25 @@
+{
+  "name": "@cv-tailor/infra",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "synth": "cdk synth",
+    "build": "cdk synth --quiet"
+  },
+  "devDependencies": {
+    "@cv-tailor/config": "workspace:*",
+    "@types/node": "^24.19.0",
+    "aws-cdk": "^2.1143.0",
+    "eslint": "^10.11.0",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.2"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.271.0",
+    "constructs": "^10.8.0"
+  }
+}

@@ -38,7 +38,8 @@
           "editor.codeActionsOnSave": {
             "source.fixAll": "explicit",
             "source.organizeImports": "explicit"
-          }
+          },
+          "python.defaultInterpreterPath": "${containerWorkspaceFolder}/services/agents/.venv/bin/python"
         }
       }
     }
