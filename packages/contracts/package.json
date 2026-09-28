@@ -1,22 +1,26 @@
 {
-  "name": "@cv-tailor/api",
+  "name": "@cv-tailor/contracts",
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "scripts": {
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "generate": "node scripts/generate.ts && prettier --write schemas"
   },
   "dependencies": {
-    "@cv-tailor/contracts": "workspace:*"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@cv-tailor/config": "workspace:*",
-    "@types/aws-lambda": "^8.10.163",
     "@types/node": "^24.19.0",
     "eslint": "^10.11.0",
     "typescript": "~6.0.3",
-    "vitest": "^5.0.2"
+    "vitest": "^5.0.2",
+    "prettier": "^3.9.9"
   }
 }

@@ -49,7 +49,7 @@ The project already uses pnpm 12 (pinned through Corepack). pnpm 12 covers most 
 | Changed packages only   | `pnpm --filter "...[origin/main]" <script>` selects changed packages and their dependents.                            | [Filtering](https://pnpm.io/filtering)                             |
 | Task caching            | Only through `pnpm pipeline` (added in v12.4.0, marked **experimental**). A plain `pnpm -r run` never uses the cache. | [pnpm pipeline](https://pnpm.io/cli/pipeline)                      |
 
-The contracts pipeline also does not need build ordering. The generated Zod and Pydantic files are committed into the packages that use them, so no package waits for a contracts build step. Only the CI drift check runs the generator.
+The contracts pipeline also does not need build ordering. The API reads the Zod source directly, and the generated Pydantic files are committed into the agent service, so no package waits for a contracts build step. Only the generator and the CI drift check need an order ([ADR-0003](0003-contracts-codegen.md)).
 
 ## Options Considered
 
@@ -127,7 +127,7 @@ Details:
 - **Layout.** `apps/` holds the TypeScript deployables, `packages/` holds shared code, `services/` holds the Python agent service, and `infra/` holds the CDK app. The full tree is in the [Sprint 0 plan](../sprints/sprint-00-foundation.md#target-repository-structure).
 - **Workspace config.** `pnpm-workspace.yaml` lists the packages (`apps/*`, `packages/*`, `services/*`, `infra`) and declares task dependencies in a `tasks` block.
 - **Python integration.** `services/agents` has a thin `package.json` whose scripts call `uv run`, so pnpm runs Python tasks together with the TypeScript tasks. uv remains the only owner of Python dependencies.
-- **Contracts.** `packages/contracts` holds JSON Schema as the single source of truth. Codegen produces Zod (TypeScript) and Pydantic (Python) types. Generated files are committed, and CI fails if they are out of date.
+- **Contracts.** `packages/contracts` is the single source of truth for payloads. Generated files are committed, and CI fails if they are out of date. The source format and codegen tools are decided in [ADR-0003](0003-contracts-codegen.md): Zod schemas, with JSON Schema and Pydantic generated from them.
 - **One entry point.** A root script, `pnpm run check`, runs lint, typecheck, test, and build across every package in both languages, locally and in CI.
 
 Option B is chosen over:
