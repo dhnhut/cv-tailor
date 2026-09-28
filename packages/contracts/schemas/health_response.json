@@ -1,0 +1,16 @@
+{
+  "title": "HealthResponse",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "health_response.json",
+  "type": "object",
+  "properties": {
+    "status": {
+      "type": "string",
+      "const": "ok",
+      "description": "Always \"ok\" when the service is up."
+    }
+  },
+  "required": ["status"],
+  "additionalProperties": false,
+  "description": "Liveness check response."
+}

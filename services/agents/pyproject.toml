@@ -7,7 +7,9 @@ authors = [
     { name = "dhnhut@gmail.com", email = "dhnhut@gmail.com" }
 ]
 requires-python = ">=3.12,<3.13"
-dependencies = []
+dependencies = [
+    "pydantic>=2.13.5",
+]
 
 [build-system]
 requires = ["uv_build>=0.12.19,<0.13.0"]
@@ -15,6 +17,7 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "datamodel-code-generator>=0.83.0",
     "mypy>=2.3.1",
     "pytest>=9.1.1",
     "ruff>=0.16.9",
@@ -31,7 +34,22 @@ select = ["E", "F", "W", "I", "B", "UP", "SIM"]
 strict = true
 files = ["src", "tests"]
 python_version = "3.12"
+plugins = ["pydantic.mypy"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = ["--import-mode=importlib", "-ra", "--strict-markers"]
+
+[tool.datamodel-codegen]
+input = "../../packages/contracts/schemas"
+input-file-type = "jsonschema"
+output = "src/cv_tailor_agents/contracts"
+output-model-type = "pydantic_v2.BaseModel"
+target-python-version = "3.12"
+use-annotated = true
+field-constraints = true
+use-standard-collections = true
+use-union-operator = true
+use-schema-description = true
+disable-timestamp = true
+formatters = ["ruff-format", "ruff-check"]

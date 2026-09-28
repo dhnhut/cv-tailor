@@ -9,7 +9,9 @@
   "scripts": {
     "check": "prettier --check . && pnpm -r run --if-present check",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "generate": "pnpm -r run --if-present generate",
+    "contracts:check": "bash scripts/check-contracts.sh"
   },
   "devDependencies": {
     "@cv-tailor/config": "workspace:*",

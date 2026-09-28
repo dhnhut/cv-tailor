@@ -3,8 +3,12 @@
   "private": true,
   "version": "0.0.0",
   "scripts": {
+    "generate": "rm -rf src/cv_tailor_agents/contracts && uv run datamodel-codegen",
     "lint": "uv run ruff check && uv run ruff format --check",
     "typecheck": "uv run mypy",
     "test": "uv run pytest"
+  },
+  "devDependencies": {
+    "@cv-tailor/contracts": "workspace:*"
   }
 }

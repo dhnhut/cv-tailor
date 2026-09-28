@@ -187,20 +187,21 @@ An **evaluation benchmark** is required. It measures output quality and checks t
 
 ## 7. Architecture
 
-| Layer                  | Technology                                                                                                                                                                                          |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Frontend               | Vite, React, TypeScript SPA, Tailwind CSS, served via CloudFront                                                                                                                                    |
-| API                    | AWS API Gateway                                                                                                                                                                                     |
-| Backend                | Node.js 24, TypeScript, AWS Lambda (serverless)                                                                                                                                                     |
-| Database               | Amazon DynamoDB                                                                                                                                                                                     |
-| File storage           | Amazon S3 (direct upload)                                                                                                                                                                           |
-| Auth                   | Amazon Cognito                                                                                                                                                                                      |
-| AI agents              | Python 3.12, LangChain, LangGraph on Bedrock AgentCore                                                                                                                                              |
-| Infrastructure as Code | AWS CDK                                                                                                                                                                                             |
-| CI/CD                  | GitHub Actions                                                                                                                                                                                      |
-| Package managers       | pnpm (via Corepack) for TypeScript, uv for Python                                                                                                                                                   |
-| Repository             | Monorepo: pnpm workspaces with pnpm's built-in task orchestration, plus a `package.json` wrapper so pnpm can run the Python service's tasks ([ADR-0001](docs/adr/0001-monorepo-pnpm-workspaces.md)) |
-| Secrets                | SSM Parameter Store; Secrets Manager when needed                                                                                                                                                    |
+| Layer                  | Technology                                                                                                                                                                                                  |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Frontend               | Vite, React, TypeScript SPA, Tailwind CSS, served via CloudFront                                                                                                                                            |
+| API                    | AWS API Gateway                                                                                                                                                                                             |
+| Backend                | Node.js 24, TypeScript, AWS Lambda (serverless)                                                                                                                                                             |
+| Database               | Amazon DynamoDB                                                                                                                                                                                             |
+| File storage           | Amazon S3 (direct upload)                                                                                                                                                                                   |
+| Auth                   | Amazon Cognito                                                                                                                                                                                              |
+| AI agents              | Python 3.12, LangChain, LangGraph on Bedrock AgentCore                                                                                                                                                      |
+| Infrastructure as Code | AWS CDK                                                                                                                                                                                                     |
+| CI/CD                  | GitHub Actions                                                                                                                                                                                              |
+| Package managers       | pnpm (via Corepack) for TypeScript, uv for Python                                                                                                                                                           |
+| Repository             | Monorepo: pnpm workspaces with pnpm's built-in task orchestration, plus a `package.json` wrapper so pnpm can run the Python service's tasks ([ADR-0001](docs/adr/0001-monorepo-pnpm-workspaces.md))         |
+| Contracts              | Zod schemas are the single source of truth for API ↔ agent payloads. JSON Schema and Pydantic models are generated from them, committed, and checked in CI ([ADR-0003](docs/adr/0003-contracts-codegen.md)) |
+| Secrets                | SSM Parameter Store; Secrets Manager when needed                                                                                                                                                            |
 
 **Backend-to-agent communication:** synchronous for chat, asynchronous for long-running generation.
 
