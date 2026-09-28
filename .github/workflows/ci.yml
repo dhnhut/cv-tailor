@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read # least privilege: CI only reads the repo
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }} # never cancel runs on main
+
+jobs:
+  check: # stable job name, required by the branch protection ruleset (S0-06)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+      UV_LOCKED: '1' # uv fails if uv.lock is out of date (Python twin of --frozen-lockfile)
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      - name: Enable Corepack (pnpm version from packageManager)
+        run: corepack enable
+
+      # setup-node's pnpm cache needs pnpm on PATH before it runs, so cache the store explicitly.
+      - name: Get pnpm store path
+        id: pnpm-store
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-store-${{ runner.os }}-
+
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          python-version: '3.12'
+          enable-cache: true
+          cache-dependency-glob: services/agents/uv.lock
+
+      - name: Tool versions
+        run: node -v && pnpm -v && uv --version && uv run --directory services/agents python --version
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Sync Python dependencies
+        run: uv sync
+        working-directory: services/agents
+
+      - name: Lint, typecheck, test, build (build includes cdk synth)
+        run: pnpm run check
+
+      # Runs last: it regenerates the contracts, which changes the working tree.
+      - name: Contracts drift check
+        run: pnpm run contracts:check
