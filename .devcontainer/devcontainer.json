@@ -26,7 +26,8 @@
         "ms-python.python",
         "ms-python.mypy-type-checker",
         "charliermarsh.ruff",
-        "EditorConfig.EditorConfig"
+        "EditorConfig.EditorConfig",
+        "Anthropic.claude-code"
       ],
       "settings": {
         "editor.formatOnSave": true,
