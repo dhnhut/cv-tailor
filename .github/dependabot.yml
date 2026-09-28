@@ -8,3 +8,21 @@ updates:
     groups:
       github-actions:
         patterns: ['*']
+
+  # The pnpm workspace: one lockfile at the root covers every TypeScript package.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      npm-minor-patch:
+        update-types: [minor, patch]
+
+  # The Python agent service (uv.lock).
+  - package-ecosystem: uv
+    directory: /services/agents
+    schedule:
+      interval: weekly
+    groups:
+      uv-minor-patch:
+        update-types: [minor, patch]

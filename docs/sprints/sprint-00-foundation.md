@@ -2,9 +2,9 @@
 
 **Sprint goal:** A monorepo skeleton where every part builds, lints, and tests in CI, plus an evidence-based AWS region decision for every required service.
 
-**Dates (tentative):** 2026-09-28 to 2026-10-04 (1 week)
+**Dates:** 2026-09-25 to 2026-09-28 (planned: 2026-09-28 to 2026-10-04)
 
-**Status:** Planned
+**Status:** Done
 
 ## Scope
 
@@ -161,10 +161,37 @@ Steps 2–6 (cloud) and 7–17 (repo) are independent, so they can run in parall
 
 ## Sprint Review
 
-_To be filled in at the end of the sprint._
-
 - **Done:**
-- **Not done / carried over:**
-- **What changed and why:** S0-08 originally picked the first suitable region in the order Auckland → Sydney → `us-east-1`. The rule was replaced by a single region, `us-east-1`, for simplicity and feature coverage ([ADR-0002](../adr/0002-aws-region.md)). The Node.js version moved from 22 to 24, because the Lambda `nodejs22.x` runtime is deprecated on 2027-04-30 and `nodejs24.x` on 2028-04-30 ([report §6](../cloud/service-availability.md#6-other-findings)).
+  - S0-01 Sprint docs framework (bac3713).
+  - S0-02 ADR-0001, monorepo with pnpm workspaces (PR #1).
+  - S0-03 Root workspace and shared config (PR #2).
+  - S0-07, S0-08 Service availability report, check script, and ADR-0002, single region `us-east-1` (PR #3).
+  - Node.js 22 → 24 upgrade (PR #4).
+  - S0-04 Package skeletons for web, api, agents, and infra (PR #5).
+  - S0-04b Contracts pipeline and ADR-0003 (PR #6).
+  - S0-05 CI workflow and Dependabot (PR #7).
+  - S0-06 Branch protection: the ruleset requires a PR and the `check` status check. The required check was added during the sprint review, because the first ruleset required a PR but had no status checks. A first attempt required `ci.yml`, which never reports, and was corrected to `check`.
+  - Sprint close: `docs/runbooks/` placeholder, root `README.md`, and Dependabot for npm and uv.
+  - Verified: the filtered run `pnpm --filter "...[origin/main]" test` with a change in `packages/contracts` ran only contracts, api, and agents. Web and infra were skipped.
+- **Not done / carried over:** Nothing.
+- **What changed and why:**
+  - S0-08 originally picked the first suitable region in the order Auckland → Sydney → `us-east-1`. The rule was replaced by a single region, `us-east-1`, for simplicity and feature coverage ([ADR-0002](../adr/0002-aws-region.md)).
+  - The Node.js version moved from 22 to 24, because the Lambda `nodejs22.x` runtime is deprecated on 2027-04-30 and `nodejs24.x` on 2028-04-30 ([report §6](../cloud/service-availability.md#6-other-findings)).
+  - Contracts are **Zod first**, not JSON Schema first. Step 14 planned to compare JSON Schema → Zod tools. The research found one tool archived, one lossy, and one experimental, so Zod became the source of truth and `z.toJSONSchema()` plus `datamodel-code-generator` generate the rest ([ADR-0003](../adr/0003-contracts-codegen.md)).
+  - `infra` uses Vitest instead of the Jest that `cdk init` generates, so every TypeScript package has one test runner. Its test timeout is 30 s, because synthesising a stack in-process can exceed the 5 s default under the parallel load of `pnpm run check`.
+  - pnpm 12.5.1 can leave the dependency-free `services/agents` out of `pnpm-lock.yaml`, which makes `--frozen-lockfile` fail. The fix, `pnpm install --fix-lockfile`, is documented in `services/agents/README.md`.
 - **Lessons learned:**
-- **Sprint 1 backlog:**
+  - Checking runtime lifecycles early pays off. The service availability research found the Node.js 22 Lambda deprecation before any code depended on it.
+  - Verify settings, don't assume them. The branch ruleset required a PR but no status check. The sprint review caught it by reading the ruleset back through the GitHub API.
+  - Research can overturn a plan. Step 14 assumed a JSON Schema-first pipeline, and the tool comparison showed Zod-first was simpler and safer. The ADR records why.
+  - A required status check matches the **check-run name**, which for GitHub Actions is the job name (`check`), not the workflow file (`ci.yml`). A wrong name doesn't fail loudly: every PR just waits for a check that never arrives.
+  - A thin `package.json` wrapper is enough to put Python under pnpm's task graph, with uv still owning Python dependencies.
+  - The sprint finished in 4 days, not 7. Each backlog item had its own small PR.
+- **Sprint 1 backlog (draft):**
+  - Decide D-13 (MVP scope) before Sprint 1 feature work is planned.
+  - Create the AWS Organization and the `dev`, `stag`, and `prod` accounts.
+  - Deploy from GitHub Actions with OIDC (no long-lived AWS keys) and CDK bootstrap in each account.
+  - First deploy of the hello stack to `dev`.
+  - AWS Budgets alarms for each environment (AGENTS.md §8).
+  - Re-run `scripts/aws-service-check.sh` in the new accounts (report caveat: model access and quotas are per account).
+  - Turn on coverage gates at the 80% target.
