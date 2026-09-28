@@ -1,0 +1,52 @@
+# cv-tailor-agents
+
+The Python agent service for CV Tailor. The agents run with LangChain and LangGraph on AWS Bedrock AgentCore (see `AGENTS.md` §5).
+
+At this stage the package is a skeleton: one `health()` function and one test. The agent modules come in a later sprint.
+
+## Setup
+
+uv manages the Python version and all Python dependencies. The lockfile, `uv.lock`, is committed.
+
+```bash
+cd services/agents
+uv sync
+```
+
+`uv sync` creates `.venv/` with Python 3.12 and installs the package in editable mode, together with the `dev` dependency group (ruff, mypy, pytest).
+
+## Commands
+
+| Task      | Command                                           | Config in `pyproject.toml`  |
+| --------- | ------------------------------------------------- | --------------------------- |
+| Test      | `uv run pytest`                                   | `[tool.pytest.ini_options]` |
+| Lint      | `uv run ruff check && uv run ruff format --check` | `[tool.ruff]`               |
+| Typecheck | `uv run mypy`                                     | `[tool.mypy]` (strict)      |
+
+## Running from the repo root
+
+`package.json` is a thin wrapper. Its `lint`, `typecheck`, and `test` scripts only call `uv run`, so the root `pnpm run check` covers this service together with the TypeScript packages. uv still owns every Python dependency. See [ADR-0001](../../docs/adr/0001-monorepo-pnpm-workspaces.md).
+
+```bash
+pnpm --filter @cv-tailor/agents test
+```
+
+This package has no npm dependencies. With pnpm 12.5.1, `pnpm install` may not add its empty entry to `pnpm-lock.yaml`, and `pnpm install --frozen-lockfile` then fails with `ERR_PNPM_PACKAGE_MANAGER_NO_IMPORTER`. Run `pnpm install --fix-lockfile` to add it.
+
+## Layout
+
+```text
+services/agents/
+├── src/cv_tailor_agents/   # the package (src layout, typed via py.typed)
+├── tests/                  # pytest tests; they import the installed package
+├── evals/                  # evaluation benchmark (placeholder)
+├── pyproject.toml          # project metadata and tool config
+├── uv.lock
+└── package.json            # pnpm wrapper
+```
+
+Tests import the package by name (`from cv_tailor_agents.health import health`), not by file path. The src layout makes this the only way that works, so the tests exercise the package the way it is installed.
+
+## Editor
+
+The devcontainer points VS Code at `services/agents/.venv/bin/python`. If Pylance reports `reportMissingImports`, run **Python: Select Interpreter** and choose that path.
