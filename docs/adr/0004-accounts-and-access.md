@@ -105,6 +105,7 @@ Rules:
 
 - **Naming:** `<project>-<env>` for workload accounts. Shared accounts get a plain name (`log-archive`).
 - **Root email addresses:** each account has its own address, and all of them deliver to one mailbox (plus-aliases or addresses on an owned domain). The real addresses are not recorded in this repository.
+- **Account IDs:** not recorded in this repository either, because it is public. The CDK app reads them from `CVT_<ENV>_ACCOUNT_ID` environment variables, set in a local, gitignored `infra/.env` or by CI.
 - **Management root user:** MFA on, used only for break-glass tasks that need root.
 - **Member root users:** **centralized root access management** is turned on. Member accounts have no root password, access keys, or MFA devices to lose. A task that needs root in a member account (for example deleting a bucket policy that locks everyone out) runs from the management account as a short-lived privileged session (`sts:AssumeRoot`).
 - **Management-to-member access role:** every member account keeps the default `OrganizationAccountAccessRole` that Organizations creates. The management account can assume it, and it has administrator permissions. It is a break-glass path only. Daily access uses IAM Identity Center.

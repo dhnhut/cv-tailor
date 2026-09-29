@@ -1,8 +1,9 @@
 import { App } from 'aws-cdk-lib';
-import { HelloStack } from '../lib/hello-stack.ts';
+import { loadEnvironments } from '../config/environments.ts';
+import { CvTailorStage } from '../lib/cv-tailor-stage.ts';
 
 const app = new App();
 
-new HelloStack(app, 'CvTailor-Hello', {
-  env: { region: 'us-east-1' }, // single region, ADR-0002
-});
+for (const config of loadEnvironments()) {
+  new CvTailorStage(app, config.name, { config });
+}

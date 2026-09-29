@@ -1,5 +1,5 @@
 {
-  "app": "node bin/infra.ts",
+  "app": "node --env-file-if-exists=.env bin/infra.ts",
   "watch": {
     "include": ["**"],
     "exclude": [
