@@ -1,0 +1,11 @@
+{
+  "Rules": [
+    {
+      "ID": "ExpireAfter90Days",
+      "Status": "Enabled",
+      "Filter": {},
+      "Expiration": { "Days": 90 },
+      "AbortIncompleteMultipartUpload": { "DaysAfterInitiation": 7 }
+    }
+  ]
+}
