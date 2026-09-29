@@ -161,11 +161,15 @@ Steps 6 and 11 only touch the repo, so they can run while steps 3–5 (console w
 - **Done:**
   - S1-03: the Organization has `cv-tailor-dev` and `cv-tailor-stag` in `Workloads/NonProd`, `cv-tailor-prod` in `Workloads/Prod`, and `log-archive` in `Security`, all `ACTIVE`. The management root user has MFA. Centralized root access management (root credentials management and root sessions) is on. Each of the five accounts has a unique email address.
   - S1-04: IAM Identity Center is enabled in `us-east-1` with one user in an `Administrators` group. The group has `AdministratorAccess` (1 hour) and `ReadOnlyAccess` (4 hours) in all five accounts. The profiles `org-mgmt`, `org-log-archive`, `cvt-dev`, `cvt-stag`, `cvt-prod`, and `cvt-prod-ro` work with `aws sso login`. The management account IAM user and all old access keys are deleted, and no account has IAM users.
+  - S1-06: `infra/config/environments.ts` defines `dev`, `stag`, and `prod` in `us-east-1`, and `infra/bin/infra.ts` builds one `CvTailorStage` for each. Every stage holds the hello stack (`<env>/CvTailor-Hello`, CloudFormation name `<env>-CvTailor-Hello`). Tests check that each stage synthesises, uses its own account, and names no region other than `us-east-1`.
 - **Not done / carried over:**
 - **What changed and why:**
   - S1-04: MFA is context-aware instead of asked at every sign-in, because there is one owner. ADR-0004 §3 records this and switches to always-on when a second person joins.
   - S1-04: the IAM user was deleted, not kept as a console fallback. Break-glass access is the management root user (MFA) and `sts:AssumeRoot`, so ADR-0004 needs no exception.
   - S1-04: access is assigned to a group, not to the user, so adding or removing a person is one membership change.
+  - S1-06: account IDs are not committed, because the repository is public. The config reads them from `CVT_DEV_ACCOUNT_ID`, `CVT_STAG_ACCOUNT_ID`, and `CVT_PROD_ACCOUNT_ID`, set in the shell or in a gitignored `infra/.env` (template: `infra/.env.example`). A missing or malformed ID stops synthesis, instead of falling back to an account-agnostic stack that would deploy to whichever account the current credentials belong to. ADR-0004 §2 records this.
+  - S1-06: CI synthesises with `CVT_PLACEHOLDER_ACCOUNTS=1` (the infra `build` script), which uses account `000000000000`. The CDK CLI refuses to deploy a stack whose account doesn't match the credentials, so placeholder mode can't deploy. The S1-08 deploy job must supply all three real IDs, because the app builds every stage.
+  - S1-06: stacks now live inside Stages, so the CDK CLI needs a `'**'` selector (`cdk synth '**'`, `cdk deploy 'dev/*'`); without one it only looks at top-level stacks.
 - **Lessons learned:**
   - IAM Identity Center groups and permission sets can have the same name. A stray group named `ReadOnlyAccess` was created during assignment and given both permission sets. Checking assignments with `aws sso-admin list-account-assignments` found it.
 - **Next sprint backlog:**

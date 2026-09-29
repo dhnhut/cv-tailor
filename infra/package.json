@@ -7,8 +7,8 @@
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
-    "synth": "cdk synth",
-    "build": "cdk synth --quiet"
+    "synth": "cdk synth '**'",
+    "build": "CVT_PLACEHOLDER_ACCOUNTS=1 cdk synth --quiet '**'"
   },
   "devDependencies": {
     "@cv-tailor/config": "workspace:*",
