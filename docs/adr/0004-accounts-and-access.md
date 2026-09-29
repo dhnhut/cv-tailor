@@ -129,18 +129,21 @@ Rules:
 Each workload account has one IAM OIDC identity provider for `token.actions.githubusercontent.com`, and one deploy role (`GithubDeployRole`).
 
 - **Trust:** `sts:AssumeRoleWithWebIdentity` only when `aud` is `sts.amazonaws.com` and `sub` is exactly `repo:dhnhut/cv-tailor:environment:<env>`. Trusting the GitHub Environment, not a branch, means the Environment's protection rules (branch filter, and later manual approval for `prod`) also protect the AWS role.
-- **Permissions:** only `sts:AssumeRole` on `arn:aws:iam::<account>:role/cdk-*`. The deploy role can't touch any resource directly. It can only hand work to the CDK bootstrap roles.
-- The provider and role are defined in CDK (`OidcStack`). They are deployed once per account from a laptop with SSO credentials, because CI can't deploy before the role exists.
+- **Permissions:** only `sts:AssumeRole` on `arn:aws:iam::<account>:role/cdk-*`, and only when the target role's `aws-cdk:bootstrap-role` tag is `deploy`, `file-publishing`, `image-publishing`, or `lookup`. Bootstrap tags exactly those four roles. The CloudFormation execution role has no such tag, so the deploy role can't assume it, and neither can it assume any other role that happens to be named `cdk-*`. The deploy role can't touch any resource directly. It can only hand work to the CDK bootstrap roles.
+- The provider and role are defined in CDK (`OidcStack`). The provider is the native `AWS::IAM::OIDCProvider` resource, so no Lambda-backed custom resource is needed. They are deployed once per account from a laptop with SSO credentials, because CI can't deploy before the role exists.
+- `OidcStack` lives in its own stage, `<env>-access`, apart from the workload stage `<env>`. CI deploys `<env>/*` only, so a CI deploy never changes the role CI signs in with. Changing the trust is a laptop-only change. CI must never deploy with the `'**'` selector.
+- `OidcStack` has termination protection, because deleting it breaks every deploy.
 
 ### 5. CDK bootstrap trust model
 
 ```text
 GithubDeployRole (assumed through OIDC)
-  └─ cdk-*-deploy-role, cdk-*-file-publishing-role, cdk-*-lookup-role
+  └─ cdk-*-deploy-role, cdk-*-file-publishing-role, cdk-*-image-publishing-role, cdk-*-lookup-role
       └─ cdk-*-cfn-exec-role  (used by CloudFormation only; changes resources)
 ```
 
 - Each workload account is bootstrapped by itself in `us-east-1`. No account trusts another (`--trust` is not used), because there is no central tooling account. Each environment deploys only inside its own account.
+- Bootstrap runs with `--termination-protection`, because every deploy in the account depends on the `CDKToolkit` stack.
 - The CloudFormation execution role keeps the default `AdministratorAccess` policy. This is an accepted risk: only CloudFormation can assume the role, the OIDC trust is narrow, and the SCPs still apply. Scoping it down with `--cloudformation-execution-policies` is the planned hardening step (see "When to revisit").
 
 ### 6. Service control policies
