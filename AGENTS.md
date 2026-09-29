@@ -237,13 +237,15 @@ The system must resist abuse, such as someone creating many free accounts to col
 
 ## 10. Environments and Delivery
 
-| Item         | Decision                                                                                    |
-| ------------ | ------------------------------------------------------------------------------------------- |
-| Environments | `dev`, `stag`, `prod`, each in a separate AWS account under AWS Organizations               |
-| Region       | Single region, `us-east-1`, for every environment ([ADR-0002](docs/adr/0002-aws-region.md)) |
-| Deployment   | AWS CDK through GitHub Actions                                                              |
-| Process      | Lightweight Agile/Scrum in small sprints                                                    |
-| Sprint docs  | `docs/sprints/`                                                                             |
+| Item           | Decision                                                                                                                                                            |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Environments   | `dev`, `stag`, `prod`, each in a separate AWS account under AWS Organizations, with a shared log archive account ([ADR-0004](docs/adr/0004-accounts-and-access.md)) |
+| Account access | Humans use IAM Identity Center (SSO). CI uses GitHub OIDC. No long-lived AWS keys ([ADR-0004](docs/adr/0004-accounts-and-access.md))                                |
+| Guardrails     | Service control policies and an organization CloudTrail trail ([ADR-0004](docs/adr/0004-accounts-and-access.md))                                                    |
+| Region         | Single region, `us-east-1`, for every environment ([ADR-0002](docs/adr/0002-aws-region.md))                                                                         |
+| Deployment     | AWS CDK through GitHub Actions                                                                                                                                      |
+| Process        | Lightweight Agile/Scrum in small sprints                                                                                                                            |
+| Sprint docs    | `docs/sprints/`                                                                                                                                                     |
 
 ---
 
