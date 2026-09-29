@@ -7,6 +7,9 @@ export const REGION = 'us-east-1'; // single region, ADR-0002
 export const ENVIRONMENT_NAMES = ['dev', 'stag', 'prod'] as const;
 export type EnvironmentName = (typeof ENVIRONMENT_NAMES)[number];
 
+// The only GitHub repository allowed to deploy (ADR-0004 §4). The OIDC `sub` claim is built from it.
+export const GITHUB_REPOSITORY = 'dhnhut/cv-tailor';
+
 export interface EnvironmentConfig {
   readonly name: EnvironmentName;
   readonly account: string;
