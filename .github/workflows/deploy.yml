@@ -58,8 +58,11 @@ jobs:
 
       - name: Deploy the dev stage (never '**', ADR-0004 §4)
         working-directory: infra
+        # The CDK app builds every stage (all three accounts, plus the baseline budget stages),
+        # so synthesis needs every account ID and the alert email, even though only dev/* deploys.
         env:
           CVT_DEV_ACCOUNT_ID: ${{ secrets.CVT_DEV_ACCOUNT_ID }}
           CVT_STAG_ACCOUNT_ID: ${{ secrets.CVT_STAG_ACCOUNT_ID }}
           CVT_PROD_ACCOUNT_ID: ${{ secrets.CVT_PROD_ACCOUNT_ID }}
+          CVT_ALERT_EMAIL: ${{ secrets.CVT_ALERT_EMAIL }}
         run: pnpm exec cdk deploy 'dev/*' --require-approval never --progress events
