@@ -46,6 +46,7 @@ Common commands, from the repo root:
 | Task                                           | Command                     |
 | ---------------------------------------------- | --------------------------- |
 | Lint, typecheck, test, and build every package | `pnpm run check`            |
+| Lint the GitHub Actions workflows (Docker)     | `pnpm run lint:workflows`   |
 | Regenerate the contracts                       | `pnpm run generate`         |
 | Check the generated contracts are committed    | `pnpm run contracts:check`  |
 | Format every file                              | `pnpm run format`           |

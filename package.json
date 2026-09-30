@@ -7,7 +7,8 @@
     "node": ">=24 <25"
   },
   "scripts": {
-    "check": "prettier --check . && pnpm -r run --if-present check",
+    "check": "prettier --check . && pnpm run lint:workflows && pnpm -r run --if-present check",
+    "lint:workflows": "docker run --rm -v \"$PWD:/repo:ro\" -w /repo rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 -color",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "generate": "pnpm -r run --if-present generate",

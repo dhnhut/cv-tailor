@@ -4,7 +4,7 @@
 
 **Decision:** the project runs in a **single region, `us-east-1`**, for all environments. See [ADR-0002](../adr/0002-aws-region.md). The Auckland and Sydney columns are kept as a record of the options compared.
 
-**Checked:** 2026-09-27 · **Account:** `355776456902` (`cv-dev` profile, pre-Organizations account)
+**Checked:** 2026-09-27 · **Account:** `<pre-org account>` (`cv-dev` profile, pre-Organizations account)
 
 **Regions compared:** Auckland (`ap-southeast-6`), Sydney (`ap-southeast-2`), N. Virginia (`us-east-1`)
 
