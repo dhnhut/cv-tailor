@@ -77,19 +77,21 @@ describe('baseline SCP', () => {
     expect(regionDeny.NotAction).toEqual(expect.arrayContaining(BEDROCK_INFERENCE_ACTIONS));
   });
 
-  test('allows Bedrock inference outside the allowed regions only through us. profiles', () => {
+  test('allows Bedrock inference outside the allowed regions only through us. and global. profiles', () => {
     const bedrockDeny = statement(
       policy,
-      'DenyBedrockInferenceOutsideAllowedRegionsExceptUsProfiles',
+      'DenyBedrockInferenceOutsideAllowedRegionsExceptUsAndGlobalProfiles',
     );
 
     expect(actionsOf(bedrockDeny)).toEqual(BEDROCK_INFERENCE_ACTIONS);
     expect(bedrockDeny.Condition?.StringNotEquals?.['aws:RequestedRegion']).toEqual(
       ALLOWED_REGIONS,
     );
-    expect(bedrockDeny.Condition?.ArnNotLike?.['bedrock:InferenceProfileArn']).toBe(
+    // Exact list, so allowing another profile type (for example eu.*) is a reviewed change.
+    expect(bedrockDeny.Condition?.ArnNotLike?.['bedrock:InferenceProfileArn']).toEqual([
       'arn:aws:bedrock:*:*:inference-profile/us.*',
-    );
+      'arn:aws:bedrock:*:*:inference-profile/global.*',
+    ]);
   });
 
   test('denies turning off or filtering CloudTrail', () => {

@@ -1,11 +1,12 @@
 # ADR-0002: Single AWS Region, `us-east-1`
 
-| Field       | Value         |
-| ----------- | ------------- |
-| Status      | Accepted      |
-| Date        | 2026-09-27    |
-| Deciders    | Project owner |
-| Sprint item | S0-08         |
+| Field       | Value                                                             |
+| ----------- | ----------------------------------------------------------------- |
+| Status      | Accepted                                                          |
+| Date        | 2026-09-27                                                        |
+| Amended     | 2026-09-30: `global.` inference profiles may be used for any task |
+| Deciders    | Project owner                                                     |
+| Sprint item | S0-08                                                             |
 
 ## Context
 
@@ -63,7 +64,7 @@ Rejected, because it adds complexity for no gain in service coverage.
 Use **a single AWS region, `us-east-1`**, for every environment (`dev`, `stag`, `prod`).
 
 - All regional resources are deployed to `us-east-1`. CloudFront is global.
-- Model calls use `us.` inference profiles (US-only routing) or `global.` profiles (worldwide routing). Which profile each task uses is decided together with the model for that task.
+- Model calls may use `global.` inference profiles (worldwide routing) for any task, including as the default. `us.` profiles (US-only routing) stay available. Every call starts in `us-east-1`, which the baseline SCP enforces ([ADR-0004](0004-accounts-and-access.md)).
 - CDK stacks set the region explicitly, not from the developer's local profile.
 
 Option C is chosen over Option B for simplicity and feature coverage. At the portfolio stage, keeping data in Australia matters less than having one region with every feature as early as possible.
@@ -78,7 +79,7 @@ Option C is chosen over Option B for simplicity and feature coverage. At the por
 
 ### Negative
 
-- Candidate PII (knowledge base documents, profiles, conversations) is stored in the US. The privacy notice must say this clearly.
+- Candidate PII (knowledge base documents, profiles, conversations) is stored in the US. Prompts sent through `global.` profiles, which can contain PII, may be processed in any supported commercial region. The privacy notice must say both clearly.
 - NZ and AU users see extra network latency. Chat streaming and async generation hide most of it.
 - Moving region later is expensive. Data in S3 and DynamoDB can be copied, but **Cognito user pools can't be moved**, and password hashes can't be exported. Users would have to be migrated, for example with a migration Lambda trigger or a password reset.
 
@@ -88,7 +89,7 @@ Option C is chosen over Option B for simplicity and feature coverage. At the por
 | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | A user or partner requires data residency in NZ or AU.               | Keep region values in one CDK config, not hard-coded, so a second deployment in Sydney stays possible. Sydney had every service at the time of this decision. |
 | A `us-east-1` regional outage affects the 99.9% availability target. | Accepted at the portfolio stage. Multi-region failover is out of scope.                                                                                       |
-| `global.` inference profiles process prompts outside the US.         | Choose `us.` profiles when a task sends PII to the model, unless the model is only available through `global.`.                                               |
+| `global.` inference profiles process prompts outside the US.         | Accepted at the portfolio stage: data residency is not a requirement yet. If it becomes one (see below), move PII-bearing tasks to `us.` profiles.            |
 
 ### When to revisit this decision
 
