@@ -1,44 +1,79 @@
 import { describe, expect, test } from 'vitest';
 import {
   PLACEHOLDER_ACCOUNT_ID,
+  PLACEHOLDER_ALERT_EMAIL,
   PLACEHOLDER_FLAG,
+  REGION,
   loadEnvironments,
 } from '../config/environments.ts';
+import { TEST_ENV } from './test-app.ts';
 
-const VALID_ENV = {
-  CVT_DEV_ACCOUNT_ID: '111111111111',
-  CVT_STAG_ACCOUNT_ID: '222222222222',
-  CVT_PROD_ACCOUNT_ID: '333333333333',
-};
+const EMAIL = TEST_ENV.CVT_ALERT_EMAIL;
 
 describe('loadEnvironments', () => {
-  test('builds dev, stag and prod in us-east-1 from the account ID variables', () => {
-    expect(loadEnvironments(VALID_ENV)).toEqual([
-      { name: 'dev', account: '111111111111', region: 'us-east-1' },
-      { name: 'stag', account: '222222222222', region: 'us-east-1' },
-      { name: 'prod', account: '333333333333', region: 'us-east-1' },
+  test('builds dev, stag and prod in us-east-1 from the environment variables', () => {
+    expect(loadEnvironments(TEST_ENV)).toEqual([
+      {
+        name: 'dev',
+        account: '111111111111',
+        region: REGION,
+        alertEmail: EMAIL,
+        monthlyBudgetUsd: 5,
+      },
+      {
+        name: 'stag',
+        account: '222222222222',
+        region: REGION,
+        alertEmail: EMAIL,
+        monthlyBudgetUsd: 5,
+      },
+      {
+        name: 'prod',
+        account: '333333333333',
+        region: REGION,
+        alertEmail: EMAIL,
+        monthlyBudgetUsd: 10,
+      },
     ]);
   });
 
-  test('names every missing variable in one error', () => {
+  test('names every missing variable, with its rule, in one error', () => {
     expect(() => loadEnvironments({})).toThrow(
-      /CVT_DEV_ACCOUNT_ID, CVT_STAG_ACCOUNT_ID, CVT_PROD_ACCOUNT_ID/,
+      'Missing or invalid settings: ' +
+        'CVT_DEV_ACCOUNT_ID (expected 12 digits), ' +
+        'CVT_STAG_ACCOUNT_ID (expected 12 digits), ' +
+        'CVT_PROD_ACCOUNT_ID (expected 12 digits), ' +
+        'CVT_ALERT_EMAIL (expected an email address).',
     );
   });
 
+  // The trailing "\." proves the variable under test is the only problem named.
   test.each(['12345678901', '1234567890123', '12345678901a', ''])(
     'rejects the malformed account ID %j',
     (account) => {
-      expect(() => loadEnvironments({ ...VALID_ENV, CVT_STAG_ACCOUNT_ID: account })).toThrow(
-        /: CVT_STAG_ACCOUNT_ID\./,
+      expect(() => loadEnvironments({ ...TEST_ENV, CVT_STAG_ACCOUNT_ID: account })).toThrow(
+        /: CVT_STAG_ACCOUNT_ID \(expected 12 digits\)\./,
       );
     },
   );
 
-  test('uses the placeholder account for every environment in placeholder mode', () => {
+  test.each([undefined, '', 'not-an-email', 'a@b', 'a b@example.com'])(
+    'rejects the missing or malformed alert email %j',
+    (email) => {
+      expect(() => loadEnvironments({ ...TEST_ENV, CVT_ALERT_EMAIL: email })).toThrow(
+        /: CVT_ALERT_EMAIL \(expected an email address\)\./,
+      );
+    },
+  );
+
+  test('uses placeholders for accounts and email, and the real budgets, in placeholder mode', () => {
     const configs = loadEnvironments({ [PLACEHOLDER_FLAG]: '1' });
 
     expect(configs.map((c) => c.name)).toEqual(['dev', 'stag', 'prod']);
-    for (const config of configs) expect(config.account).toBe(PLACEHOLDER_ACCOUNT_ID);
+    expect(configs.map((c) => c.monthlyBudgetUsd)).toEqual([5, 5, 10]);
+    for (const config of configs) {
+      expect(config.account).toBe(PLACEHOLDER_ACCOUNT_ID);
+      expect(config.alertEmail).toBe(PLACEHOLDER_ALERT_EMAIL);
+    }
   });
 });

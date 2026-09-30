@@ -2,16 +2,12 @@ import { Match, Template } from 'aws-cdk-lib/assertions';
 import { describe, expect, test } from 'vitest';
 import { GITHUB_REPOSITORY, loadEnvironments } from '../config/environments.ts';
 import { OidcStack } from '../lib/oidc-stack.ts';
-import { testApp } from './test-app.ts';
+import { testApp, TEST_ENV } from './test-app.ts';
 
 // GitHub deploy role (S1-07, ADR-0004 §4). Expected values are written out literally,
 // so changing a constant in the code also fails here.
 
-const CONFIGS = loadEnvironments({
-  CVT_DEV_ACCOUNT_ID: '111111111111',
-  CVT_STAG_ACCOUNT_ID: '222222222222',
-  CVT_PROD_ACCOUNT_ID: '333333333333',
-});
+const CONFIGS = loadEnvironments(TEST_ENV);
 
 describe.each(CONFIGS)('OIDC stack for $name', (config) => {
   const stack = new OidcStack(testApp(), 'GithubOidc', {
