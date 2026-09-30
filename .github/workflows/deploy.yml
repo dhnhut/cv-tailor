@@ -1,0 +1,65 @@
+name: Deploy
+
+# Called by ci.yml after `check` passes on a push to main (S1-08).
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    # OIDC sub = repo:dhnhut/cv-tailor:environment:dev. The Environment's branch rule limits it to main.
+    environment: dev
+    permissions:
+      contents: read
+      id-token: write # lets the job request a GitHub OIDC token for AWS
+    concurrency:
+      group: deploy-dev
+      cancel-in-progress: false # never stop a CloudFormation update halfway
+    env:
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      - name: Enable Corepack (pnpm version from packageManager)
+        run: corepack enable
+
+      # setup-node's pnpm cache needs pnpm on PATH before it runs, so cache the store explicitly.
+      - name: Get pnpm store path
+        id: pnpm-store
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-store-${{ runner.os }}-
+      - run: pnpm install --frozen-lockfile
+
+      # After install, so dependency install scripts never see AWS credentials.
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::${{ secrets.CVT_DEV_ACCOUNT_ID }}:role/GithubDeployRole
+          role-session-name: cv-tailor-deploy-${{ github.run_id }}
+          mask-aws-account-id: true # off by default in v6
+
+      - name: Show deploy identity
+        run: aws sts get-caller-identity --query Arn --output text
+
+      - name: Deploy the dev stage (never '**', ADR-0004 §4)
+        working-directory: infra
+        env:
+          CVT_DEV_ACCOUNT_ID: ${{ secrets.CVT_DEV_ACCOUNT_ID }}
+          CVT_STAG_ACCOUNT_ID: ${{ secrets.CVT_STAG_ACCOUNT_ID }}
+          CVT_PROD_ACCOUNT_ID: ${{ secrets.CVT_PROD_ACCOUNT_ID }}
+        run: pnpm exec cdk deploy 'dev/*' --require-approval never --progress events
