@@ -63,7 +63,7 @@
       }
     },
     {
-      "Sid": "DenyBedrockInferenceOutsideAllowedRegionsExceptUsProfiles",
+      "Sid": "DenyBedrockInferenceOutsideAllowedRegionsExceptUsAndGlobalProfiles",
       "Effect": "Deny",
       "Action": [
         "bedrock:InvokeModel",
@@ -74,7 +74,10 @@
       "Condition": {
         "StringNotEquals": { "aws:RequestedRegion": ["us-east-1"] },
         "ArnNotLike": {
-          "bedrock:InferenceProfileArn": "arn:aws:bedrock:*:*:inference-profile/us.*"
+          "bedrock:InferenceProfileArn": [
+            "arn:aws:bedrock:*:*:inference-profile/us.*",
+            "arn:aws:bedrock:*:*:inference-profile/global.*"
+          ]
         }
       }
     },
