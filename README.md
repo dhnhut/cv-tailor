@@ -2,7 +2,7 @@
 
 An AI application that writes a tailored CV and cover letter for a specific job, using only facts from the candidate's own documents. A candidate builds a personal knowledge base once. A multi-agent system on AWS Bedrock AgentCore then writes job-specific documents in the candidate's own tone. A public chatbot lets headhunters ask about the candidate and check job fit.
 
-> **Status:** Sprint 0 (foundation) is done. The repository builds, lints, and tests in CI. Feature work starts in later sprints. See [`docs/sprints/`](docs/sprints/).
+> **Status:** Sprint 1 (deployable foundation) is done: a merge to `main` deploys to the `dev` account. Sprint 2 (walking skeleton and sign-in) is in progress. See [`docs/sprints/`](docs/sprints/).
 
 ## Architecture
 
