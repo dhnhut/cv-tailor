@@ -9,6 +9,7 @@ interface Statement {
   Effect: 'Allow' | 'Deny';
   Action?: string | string[];
   NotAction?: string[];
+  Resource?: string | string[];
   Condition?: Record<string, Record<string, string | string[]>>;
 }
 
@@ -25,6 +26,8 @@ const BEDROCK_INFERENCE_ACTIONS = [
   'bedrock:CreateModelInvocationJob',
 ];
 
+const SCP_FILES = ['scps/baseline.json', 'scps/log-protection.json', 'scps/emergency-deny.json'];
+
 const readText = (path: string): string =>
   readFileSync(new URL(`../org/${path}`, import.meta.url), 'utf8');
 
@@ -38,7 +41,7 @@ const statement = (policy: PolicyDocument, sid: string): Statement => {
 
 const actionsOf = (s: Statement): string[] => [s.Action ?? []].flat();
 
-describe.each(['scps/baseline.json', 'scps/log-protection.json'])('SCP %s', (path) => {
+describe.each(SCP_FILES)('SCP %s', (path) => {
   const policy = readPolicy(path);
 
   test('is a valid deny-only policy with unique Sids', () => {
@@ -103,6 +106,28 @@ describe('baseline SCP', () => {
         'cloudtrail:PutEventSelectors',
       ]),
     );
+  });
+});
+
+describe('emergency deny SCP', () => {
+  const policy = readPolicy('scps/emergency-deny.json');
+  const deny = statement(policy, 'EmergencyDenyAllExceptBreakGlass');
+
+  test('denies every action on every resource', () => {
+    expect(policy.Statement).toHaveLength(1);
+    expect(deny.Action).toBe('*');
+    expect(deny.Resource).toBe('*');
+  });
+
+  test('exempts only the human SSO roles and the CDK CloudFormation execution role', () => {
+    // Exact list, so widening the break-glass path is a reviewed change.
+    expect(Object.keys(deny.Condition ?? {})).toEqual(['ArnNotLike']);
+    expect(deny.Condition?.ArnNotLike?.['aws:PrincipalArn']).toEqual([
+      'arn:aws:iam::*:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_*',
+      'arn:aws:iam::*:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_ReadOnlyAccess_*',
+      // CloudFormation deletes a stack with the role that deployed it.
+      'arn:aws:iam::*:role/cdk-*-cfn-exec-role-*',
+    ]);
   });
 });
 
