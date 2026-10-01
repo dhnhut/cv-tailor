@@ -1,3 +1,4 @@
+import { coverage } from '@cv-tailor/config/vitest';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
@@ -12,5 +13,6 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./test/setup.ts'],
+    coverage: coverage({ include: ['src/**/*.{ts,tsx}'] }),
   },
 });

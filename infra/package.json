@@ -6,13 +6,14 @@
   "scripts": {
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run",
+    "test": "vitest run --coverage",
     "synth": "cdk synth '**'",
     "build": "CVT_PLACEHOLDER_ACCOUNTS=1 cdk synth --quiet '**'"
   },
   "devDependencies": {
     "@cv-tailor/config": "workspace:*",
     "@types/node": "^24.19.0",
+    "@vitest/coverage-v8": "5.0.2",
     "aws-cdk": "^2.1143.0",
     "eslint": "^10.11.0",
     "typescript": "~6.0.3",

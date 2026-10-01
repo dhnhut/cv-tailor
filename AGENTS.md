@@ -225,13 +225,13 @@ The system must resist abuse, such as someone creating many free accounts to col
 
 ## 9. Non-Functional Requirements
 
-| Area          | Target                                                         |
-| ------------- | -------------------------------------------------------------- |
-| Availability  | 99.9% in production                                            |
-| Scale         | Low user volume (portfolio stage)                              |
-| Reliability   | Production-grade behaviour, with errors handled and observable |
-| Test coverage | 80% target                                                     |
-| User focus    | New Zealand and Australia, served from `us-east-1` (see §10)   |
+| Area          | Target                                                                           |
+| ------------- | -------------------------------------------------------------------------------- |
+| Availability  | 99.9% in production                                                              |
+| Scale         | Low user volume (portfolio stage)                                                |
+| Reliability   | Production-grade behaviour, with errors handled and observable                   |
+| Test coverage | 80% minimum per package (lines, statements, functions, branches), enforced in CI |
+| User focus    | New Zealand and Australia, served from `us-east-1` (see §10)                     |
 
 ---
 
