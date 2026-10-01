@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { App } from 'aws-cdk-lib';
+import { App, type AppProps } from 'aws-cdk-lib';
 
 const { context } = JSON.parse(readFileSync(new URL('../cdk.json', import.meta.url), 'utf8')) as {
   context: Record<string, unknown>;
@@ -8,7 +8,8 @@ const { context } = JSON.parse(readFileSync(new URL('../cdk.json', import.meta.u
 // Tests match `cdk synth`: the feature flags from cdk.json, plus the CDKMetadata
 // resource the CLI adds by default. Vitest doesn't use the CLI, so a bare
 // `new App()` has neither.
-export const testApp = (): App => new App({ context, analyticsReporting: true });
+export const TEST_APP_PROPS: AppProps = { context, analyticsReporting: true };
+export const testApp = (): App => new App(TEST_APP_PROPS);
 
 // Fake settings for loadEnvironments(), so a developer's infra/.env never affects tests.
 export const TEST_ENV = {
