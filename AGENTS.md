@@ -56,11 +56,11 @@ Each requirement has an ID so sprint backlogs can refer to it.
 
 ### 4.1 Accounts and Authentication (AUTH)
 
-| ID      | Requirement                                                             |
-| ------- | ----------------------------------------------------------------------- |
-| AUTH-01 | A candidate can register for free.                                      |
-| AUTH-02 | Sign-in uses Amazon Cognito with email/password and OAuth.              |
-| AUTH-03 | Email verification is optional. A verified account gets a higher quota. |
+| ID      | Requirement                                                                                                                                                      |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AUTH-01 | A candidate can register for free.                                                                                                                               |
+| AUTH-02 | Sign-in uses Amazon Cognito with email/password and OAuth (Google at launch, LinkedIn planned). Sign-ins with the same verified email are linked to one account. |
+| AUTH-03 | Email verification is optional. A verified account gets a higher quota.                                                                                          |
 
 ### 4.2 Candidate Knowledge Base (KB)
 
@@ -68,20 +68,22 @@ Each requirement has an ID so sprint backlogs can refer to it.
 | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | KB-01 | The candidate creates a knowledge base about themselves: personal info, career data, work history, skills, certificates, hobbies, and so on. Markdown (`.md`) is supported. |
 | KB-02 | The candidate can upload writing samples, such as past applications with their job descriptions, so the system can match their tone.                                        |
-| KB-03 | Supported upload types are `.txt`, `.md`, `.docx`, and `.pdf`, up to **25 MB per file**.                                                                                    |
+| KB-03 | Supported upload types are `.txt`, `.md`, `.html`, `.doc`/`.docx`, and `.pdf`, up to **50 MB per file** (the knowledge base limit).                                         |
 | KB-04 | Files upload directly to S3 (presigned upload).                                                                                                                             |
-| KB-05 | Knowledge base documents are indexed for retrieval (RAG).                                                                                                                   |
+| KB-05 | Knowledge base documents are indexed for retrieval (RAG). Retrieval returns only the owning candidate's documents.                                                          |
+| KB-06 | Each candidate can store up to **50 MB** in total. An admin can change this for a specific candidate.                                                                       |
 
 ### 4.3 Application Generation (GEN)
 
-| ID     | Requirement                                                                                                                            |
-| ------ | -------------------------------------------------------------------------------------------------------------------------------------- |
-| GEN-01 | The candidate provides a job description (JD), as text or as a link to a public job post (for example LinkedIn or Seek).               |
-| GEN-02 | The candidate can add optional requirements, such as page count or skills to emphasise.                                                |
-| GEN-03 | The system produces a CV and a cover letter as **separate documents**. The system suggests which to produce, or the candidate chooses. |
-| GEN-04 | Generation runs **asynchronously**.                                                                                                    |
-| GEN-05 | The candidate refines the result through a **conversation** before exporting.                                                          |
-| GEN-06 | The final documents can be exported to PDF. **Exported files are not stored.**                                                         |
+| ID     | Requirement                                                                                                                                |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| GEN-01 | The candidate provides a job description (JD), as text or as a link to a public job post that loads without signing in (for example Seek). |
+| GEN-02 | The candidate can add optional requirements, such as page count or skills to emphasise.                                                    |
+| GEN-03 | The system produces a CV and a cover letter as **separate documents**. The system suggests which to produce, or the candidate chooses.     |
+| GEN-04 | Generation runs **asynchronously**.                                                                                                        |
+| GEN-05 | The candidate refines the result through a **conversation** before exporting.                                                              |
+| GEN-06 | The final documents can be exported to PDF. **Exported files are not stored.**                                                             |
+| GEN-07 | The candidate can provide the JD as a file: `.doc`/`.docx`, `.pdf`, or an image (`.png`, `.jpeg`, `.gif`, `.webp`).                        |
 
 ### 4.4 Personal Chatbot (CHAT)
 
@@ -97,12 +99,12 @@ Each requirement has an ID so sprint backlogs can refer to it.
 
 ### 4.5 Quota (QUOTA)
 
-| ID       | Requirement                                                                          |
-| -------- | ------------------------------------------------------------------------------------ |
-| QUOTA-01 | Quota is measured in tokens. One unit is roughly equal to USD 1 of model usage.      |
-| QUOTA-02 | Quotas reset both **daily** and **monthly**.                                         |
-| QUOTA-03 | Quota differs by role and tier (for example unverified, verified, or coupon holder). |
-| QUOTA-04 | There is a maximum token count per request.                                          |
+| ID       | Requirement                                                                                                                                                                                                                                |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| QUOTA-01 | Quota is measured in USD of model usage, calculated from each call's token counts and the model's price.                                                                                                                                   |
+| QUOTA-02 | Quotas reset both **daily** and **monthly**.                                                                                                                                                                                               |
+| QUOTA-03 | Quota differs by role. A candidate gets USD 0.10 per day and USD 0.50 per month. Admins (Cognito `admin` group) get USD 1 per day and USD 5 per month. Tiers (for example unverified, verified, or coupon holder) come in a later release. |
+| QUOTA-04 | There is a maximum token count per request.                                                                                                                                                                                                |
 
 ### 4.6 Admin (ADMIN)
 
@@ -153,17 +155,17 @@ The design will be refined during implementation. It will use **different models
 - **Runtime:** Python 3.12, LangChain, LangGraph
 - **Platform:** AWS Bedrock AgentCore
 
-| AgentCore / Bedrock feature       | Purpose                                               |
-| --------------------------------- | ----------------------------------------------------- |
-| Runtime                           | Hosts the agents.                                     |
-| Memory (short-term and long-term) | Keeps conversation context and candidate preferences. |
-| Gateway                           | Exposes tools to the agents.                          |
-| Observability                     | Provides tracing, metrics, and debugging.             |
-| Browser                           | Loads JDs from public job sites.                      |
-| Evaluations                       | Runs quality benchmarks on agent output.              |
-| Policy                            | Controls which actions agents are allowed to take.    |
-| Bedrock Guardrails                | Filters input and output for safety.                  |
-| Knowledge base (RAG, S3 source)   | Retrieves facts from candidate documents.             |
+| AgentCore / Bedrock feature       | Purpose                                                                                                                                                               |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Runtime                           | Hosts the agents.                                                                                                                                                     |
+| Memory (short-term and long-term) | Keeps conversation context and candidate preferences.                                                                                                                 |
+| Gateway                           | Exposes tools to the agents.                                                                                                                                          |
+| Observability                     | Provides tracing, metrics, and debugging.                                                                                                                             |
+| Browser                           | Loads JDs from public job sites.                                                                                                                                      |
+| Evaluations                       | Runs quality benchmarks on agent output.                                                                                                                              |
+| Policy                            | Controls which actions agents are allowed to take.                                                                                                                    |
+| Bedrock Guardrails                | Filters input and output for safety.                                                                                                                                  |
+| Knowledge base (RAG, S3 source)   | Retrieves facts from candidate documents. Bedrock Managed Knowledge Base, with document-level ACLs per candidate ([ADR-0007](docs/adr/0007-knowledge-base-store.md)). |
 
 Not used: Code Interpreter, Identity.
 
@@ -192,7 +194,7 @@ An **evaluation benchmark** is required. It measures output quality and checks t
 | Frontend               | Vite, React, TypeScript SPA, Tailwind CSS, served via CloudFront                                                                                                                                            |
 | API                    | AWS API Gateway                                                                                                                                                                                             |
 | Backend                | Node.js 24, TypeScript, AWS Lambda (serverless)                                                                                                                                                             |
-| Database               | Amazon DynamoDB                                                                                                                                                                                             |
+| Database               | Amazon DynamoDB, a single table with an `Entity` attribute ([ADR-0006](docs/adr/0006-data-store.md))                                                                                                        |
 | File storage           | Amazon S3 (direct upload)                                                                                                                                                                                   |
 | Auth                   | Amazon Cognito                                                                                                                                                                                              |
 | AI agents              | Python 3.12, LangChain, LangGraph on Bedrock AgentCore                                                                                                                                                      |
@@ -237,15 +239,16 @@ The system must resist abuse, such as someone creating many free accounts to col
 
 ## 10. Environments and Delivery
 
-| Item           | Decision                                                                                                                                                            |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Environments   | `dev`, `stag`, `prod`, each in a separate AWS account under AWS Organizations, with a shared log archive account ([ADR-0004](docs/adr/0004-accounts-and-access.md)) |
-| Account access | Humans use IAM Identity Center (SSO). CI uses GitHub OIDC. No long-lived AWS keys ([ADR-0004](docs/adr/0004-accounts-and-access.md))                                |
-| Guardrails     | Service control policies and an organization CloudTrail trail ([ADR-0004](docs/adr/0004-accounts-and-access.md))                                                    |
-| Region         | Single region, `us-east-1`, for every environment ([ADR-0002](docs/adr/0002-aws-region.md))                                                                         |
-| Deployment     | AWS CDK through GitHub Actions                                                                                                                                      |
-| Process        | Lightweight Agile/Scrum in small sprints                                                                                                                            |
-| Sprint docs    | `docs/sprints/`                                                                                                                                                     |
+| Item           | Decision                                                                                                                                                                                     |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Environments   | `dev`, `stag`, `prod`, each in a separate AWS account under AWS Organizations, with a shared log archive account ([ADR-0004](docs/adr/0004-accounts-and-access.md))                          |
+| Account access | Humans use IAM Identity Center (SSO). CI uses GitHub OIDC. No long-lived AWS keys ([ADR-0004](docs/adr/0004-accounts-and-access.md))                                                         |
+| Guardrails     | Service control policies and an organization CloudTrail trail ([ADR-0004](docs/adr/0004-accounts-and-access.md))                                                                             |
+| Region         | Single region, `us-east-1`, for every environment ([ADR-0002](docs/adr/0002-aws-region.md))                                                                                                  |
+| Domain         | `cv.ikiwii.com` (`prod`), `stag.cv.ikiwii.com`, and `dev.cv.ikiwii.com`, each a Route 53 zone in its own account, delegated from the registrar ([ADR-0008](docs/adr/0008-domain-and-dns.md)) |
+| Deployment     | AWS CDK through GitHub Actions                                                                                                                                                               |
+| Process        | Lightweight Agile/Scrum in small sprints                                                                                                                                                     |
+| Sprint docs    | `docs/sprints/`                                                                                                                                                                              |
 
 ---
 
@@ -253,3 +256,29 @@ The system must resist abuse, such as someone creating many free accounts to col
 
 - Storing exported PDF files
 - AgentCore Code Interpreter and Identity
+
+---
+
+## 12. MVP Scope
+
+The first release covers the candidate flow end to end. The reasons, the options compared, and the sprint order are in [ADR-0005](docs/adr/0005-mvp-scope.md).
+
+### In the MVP
+
+| Feature                              | Requirement IDs                                                                            |
+| ------------------------------------ | ------------------------------------------------------------------------------------------ |
+| Sign-in (email/password, Google)     | AUTH-01, AUTH-02                                                                           |
+| Cost guards and quota                | ADMIN-01, ADMIN-02, ADMIN-03, QUOTA-01, QUOTA-02, QUOTA-03 (candidate and admin), QUOTA-04 |
+| Knowledge base                       | KB-01, KB-03, KB-04, KB-05, KB-06                                                          |
+| CV and cover letter generation       | GEN-01, GEN-02, GEN-03, GEN-04, GEN-07, SAFE-01, SAFE-03, SAFE-04, SAFE-05, §5.5           |
+| Style matching                       | KB-02                                                                                      |
+| PDF export                           | GEN-06                                                                                     |
+| Release to `prod` at `cv.ikiwii.com` | §10                                                                                        |
+
+### Later releases, in order
+
+1. Refinement conversation (GEN-05)
+2. Tiers and abuse controls (AUTH-03, QUOTA-03 tiers, §8)
+3. Personal chatbot (CHAT-01 to CHAT-05, CHAT-07, SAFE-02)
+4. Coupons (CHAT-06)
+5. Extra credit beyond the free quota
