@@ -58,6 +58,7 @@ Common commands, from the repo root:
 - [`docs/adr/`](docs/adr/): architecture decision records
 - [`docs/sprints/`](docs/sprints/): sprint plans and reviews
 - [`docs/cloud/service-availability.md`](docs/cloud/service-availability.md): AWS service availability report
+- [`docs/runbooks/`](docs/runbooks/): operations runbooks (account access, deploy and rollback, budget alarms)
 
 ## License
 

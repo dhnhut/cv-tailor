@@ -4,12 +4,13 @@ Service control policies (SCPs) and the organization CloudTrail settings from [A
 
 These are applied by hand from the management account, not by CDK. The files here are the source of truth. When a policy changes, edit the file here first, then apply it with the commands below. `infra/test/org-policies.test.ts` checks the files in CI.
 
-| File                            | Applied to                    | Purpose                                                                                                           |
-| ------------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `scps/baseline.json`            | Root (every member account)   | Deny leaving the Organization or closing the account, region deny, Bedrock inference limit, CloudTrail protection |
-| `scps/log-protection.json`      | `Security` OU                 | Deny deleting or loosening the trail bucket (`org-trail-logs-*`)                                                  |
-| `cloudtrail/bucket-policy.json` | Trail bucket in `log-archive` | Template. Only the CloudTrail service, for the `org-trail` trail, may write. TLS only.                            |
-| `cloudtrail/lifecycle.json`     | Trail bucket in `log-archive` | Expire logs after 90 days                                                                                         |
+| File                            | Applied to                      | Purpose                                                                                                           |
+| ------------------------------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `scps/baseline.json`            | Root (every member account)     | Deny leaving the Organization or closing the account, region deny, Bedrock inference limit, CloudTrail protection |
+| `scps/log-protection.json`      | `Security` OU                   | Deny deleting or loosening the trail bucket (`org-trail-logs-*`)                                                  |
+| `scps/emergency-deny.json`      | Nothing (created, not attached) | Emergency stop for one account: deny everything except the SSO roles and the CDK CloudFormation execution role    |
+| `cloudtrail/bucket-policy.json` | Trail bucket in `log-archive`   | Template. Only the CloudTrail service, for the `org-trail` trail, may write. TLS only.                            |
+| `cloudtrail/lifecycle.json`     | Trail bucket in `log-archive`   | Expire logs after 90 days                                                                                         |
 
 ## Baseline SCP
 
@@ -102,6 +103,23 @@ aws organizations delete-policy --policy-id "$OLD" --profile org-mgmt
 # c. Log protection, after the trail delivers logs
 aws organizations attach-policy --policy-id "$LOGPROT" --target-id "$SECURITY" --profile org-mgmt
 ```
+
+### 4. Emergency deny (create only)
+
+Created once and left **unattached**. It is attached to a single account only in an emergency, following the [budget alarm runbook](../../docs/runbooks/budget-alarm.md#5-emergency-stop).
+
+```bash
+EMERGENCY=$(create EmergencyDeny "ADR-0004 emergency stop for one account" infra/org/scps/emergency-deny.json)
+aws organizations list-targets-for-policy --policy-id "$EMERGENCY" --profile org-mgmt   # expect no targets
+```
+
+The exemptions match the role ARNs by path. Before relying on the policy, check that the SSO roles have no region segment in their path:
+
+```bash
+aws iam list-roles --path-prefix /aws-reserved/sso.amazonaws.com/ --query 'Roles[].Arn' --output text --profile cvt-dev
+```
+
+Every ARN must look like `…:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_<permission set>_<suffix>`.
 
 To update a policy later: `aws organizations update-policy --policy-id <id> --content "$(jq -c . <file>)" --profile org-mgmt`.
 
