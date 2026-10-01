@@ -8,7 +8,22 @@ export const ENVIRONMENT_NAMES = ['dev', 'stag', 'prod'] as const;
 export type EnvironmentName = (typeof ENVIRONMENT_NAMES)[number];
 
 // The only GitHub repository allowed to deploy (ADR-0004 §4). The OIDC `sub` claim is built from it.
-export const GITHUB_REPOSITORY = 'dhnhut/cv-tailor';
+// GitHub's immutable subject format names the owner and repository by name and numeric ID, so a renamed
+// or re-created repository can't match. The IDs are public:
+//   gh api repos/dhnhut/cv-tailor --jq '{owner_id: .owner.id, repo_id: .id}'
+export interface GithubRepository {
+  readonly owner: string;
+  readonly ownerId: number;
+  readonly name: string;
+  readonly id: number;
+}
+
+export const GITHUB_REPOSITORY: GithubRepository = {
+  owner: 'dhnhut',
+  ownerId: 5567608,
+  name: 'cv-tailor',
+  id: 1386961484,
+};
 
 // Synth-only mode for CI, which has no real account IDs. The placeholder never
 // matches real credentials, so `cdk deploy` refuses to use it.

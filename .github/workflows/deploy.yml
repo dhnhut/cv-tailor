@@ -11,7 +11,8 @@ jobs:
   deploy:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    # OIDC sub = repo:dhnhut/cv-tailor:environment:dev. The Environment's branch rule limits it to main.
+    # OIDC sub = repo:dhnhut@5567608/cv-tailor@1386961484:environment:dev (immutable subject).
+    # The Environment's branch rule limits it to main.
     environment: dev
     permissions:
       contents: read

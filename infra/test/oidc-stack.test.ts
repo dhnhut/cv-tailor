@@ -45,7 +45,7 @@ describe.each(CONFIGS)('OIDC stack for $name', (config) => {
             Condition: {
               StringEquals: {
                 'token.actions.githubusercontent.com:aud': 'sts.amazonaws.com',
-                'token.actions.githubusercontent.com:sub': `repo:dhnhut/cv-tailor:environment:${config.name}`,
+                'token.actions.githubusercontent.com:sub': `repo:dhnhut@5567608/cv-tailor@1386961484:environment:${config.name}`,
               },
             },
           },
