@@ -70,3 +70,4 @@ jobs:
       contents: read
       id-token: write # the called workflow can't have more permissions than this job
     uses: ./.github/workflows/deploy.yml
+    secrets: inherit # the called workflow's secrets context is empty without this
