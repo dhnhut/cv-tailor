@@ -7,7 +7,7 @@ import {
   WebIdentityPrincipal,
 } from 'aws-cdk-lib/aws-iam';
 import type { Construct } from 'constructs';
-import type { EnvironmentName } from '../config/environments.ts';
+import type { EnvironmentName, GithubRepository } from '../config/environments.ts';
 
 const GITHUB_OIDC_HOST = 'token.actions.githubusercontent.com';
 const STS_AUDIENCE = 'sts.amazonaws.com';
@@ -17,7 +17,7 @@ const STS_AUDIENCE = 'sts.amazonaws.com';
 const CDK_BOOTSTRAP_ROLES = ['deploy', 'file-publishing', 'image-publishing', 'lookup'];
 
 export interface OidcStackProps extends StackProps {
-  readonly repository: string; // owner/name
+  readonly repository: GithubRepository;
   readonly environment: EnvironmentName; // GitHub Environment the job must run in
 }
 
@@ -33,12 +33,16 @@ export class OidcStack extends Stack {
       clientIds: [STS_AUDIENCE],
     });
 
+    // Immutable subject format: repo:<owner>@<owner id>/<name>@<repository id>:environment:<env>
+    const { owner, ownerId, name, id: repositoryId } = repository;
+    const subject = `repo:${owner}@${ownerId}/${name}@${repositoryId}:environment:${environment}`;
+
     const role = new Role(this, 'DeployRole', {
       roleName: 'GithubDeployRole',
       assumedBy: new WebIdentityPrincipal(provider.oidcProviderArn, {
         StringEquals: {
           [`${GITHUB_OIDC_HOST}:aud`]: STS_AUDIENCE,
-          [`${GITHUB_OIDC_HOST}:sub`]: `repo:${repository}:environment:${environment}`,
+          [`${GITHUB_OIDC_HOST}:sub`]: subject,
         },
       }),
       // No direct permissions: the role can only hand work to the CDK bootstrap roles.
