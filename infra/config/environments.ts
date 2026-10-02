@@ -69,7 +69,21 @@ export interface DnsConfig {
 // stag gets its zone, and prod its certificate, with the release path (slice R, ADR-0005).
 export const DNS: Partial<Record<EnvironmentName, DnsConfig>> = {
   dev: { certificate: true, delegations: [] },
-  prod: { certificate: false, delegations: [] },
+  prod: {
+    certificate: false,
+    delegations: [
+      {
+        // The dev-dns-Zone NameServers output, 2026-10-02.
+        zoneName: 'dev.cv.ikiwii.com',
+        nameServers: [
+          'ns-1749.awsdns-26.co.uk',
+          'ns-1117.awsdns-11.org',
+          'ns-155.awsdns-19.com',
+          'ns-524.awsdns-01.net',
+        ],
+      },
+    ],
+  },
 };
 
 export interface EnvironmentConfig {
