@@ -23,7 +23,7 @@ The CDK app has three stages for each environment, plus a DNS stage for `dev` an
 
 | Stage            | Stacks (CloudFormation name)                                                                                                                                                                      | Deployed by                               | When                                                 |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- | ---------------------------------------------------- |
-| `<env>`          | The workload: `<env>-CvTailor-Hello` today                                                                                                                                                        | CI (`dev` only, on every merge to `main`) | Every merge                                          |
+| `<env>`          | The workload: `<env>-Web`, the web app on S3 and CloudFront (S2-04)                                                                                                                               | CI (`dev` only, on every merge to `main`) | Every merge                                          |
 | `<env>-access`   | `<env>-access-GithubOidc`: the OIDC provider and `GithubDeployRole`                                                                                                                               | Laptop only                               | Only when the CI trust changes                       |
 | `<env>-baseline` | `<env>-baseline-Budget`: the monthly budget                                                                                                                                                       | Laptop only                               | Only when the budget changes                         |
 | `<env>-dns`      | `<env>-dns-Zone`: the hosted zone and its delegation records. `<env>-dns-Certificate` (`dev` only today): the certificate for `<host>` and `*.<host>` ([ADR-0008](../adr/0008-domain-and-dns.md)) | Laptop only                               | Only when a zone, delegation, or certificate changes |
@@ -32,6 +32,7 @@ Rules:
 
 - **Never deploy with `'**'`.** Always name one stage, for example `'dev/*'`. CI must never be able to change the role it signs in with, the budget that watches it, or DNS (ADR-0004 §4, ADR-0008).
 - `stag` and `prod` have no workload yet. `prod` has its `-dns` stage; `stag` gets one with the release path (slice R).
+- The workload reads the zone ID and certificate ARN from SSM, so an environment's `-dns` stage, with its certificate, must be deployed before its first workload deploy.
 - `CDKToolkit`, `<env>-access-GithubOidc`, `<env>-baseline-Budget`, `<env>-dns-Zone`, and `<env>-dns-Certificate` have termination protection. Deleting one needs `aws cloudformation update-termination-protection --no-enable-termination-protection` first, and should almost never happen. A deleted zone stack leaves its hosted zone in place (retained).
 
 ## 1. Normal deploy (CI)
@@ -47,11 +48,12 @@ Rules:
 3. Check the stack in AWS:
 
    ```bash
-   aws cloudformation describe-stacks --stack-name dev-CvTailor-Hello --profile cvt-dev \
-     --query 'Stacks[0].[StackStatus,Outputs[0].OutputValue]' --output text
+   aws cloudformation describe-stacks --stack-name dev-Web --profile cvt-dev \
+     --query 'Stacks[0].StackStatus' --output text
+   curl -sI https://dev.cv.ikiwii.com/ | head -1
    ```
 
-   Expected: `UPDATE_COMPLETE` or `CREATE_COMPLETE`, and `hello from cv-tailor`.
+   Expected: `UPDATE_COMPLETE` or `CREATE_COMPLETE`, and `HTTP/2 200`.
 
 ## 2. Preview a change
 
@@ -177,7 +179,7 @@ CloudFormation rolls a failed update back to the last working state by itself. N
 1. Find the reason. The first `*_FAILED` event from the bottom of the list is the cause; the later ones are side effects.
 
    ```bash
-   aws cloudformation describe-stack-events --stack-name dev-CvTailor-Hello --profile cvt-dev --max-items 20 \
+   aws cloudformation describe-stack-events --stack-name dev-Web --profile cvt-dev --max-items 20 \
      --query 'StackEvents[].[Timestamp,LogicalResourceId,ResourceStatus,ResourceStatusReason]' --output table
    ```
 
@@ -185,12 +187,12 @@ CloudFormation rolls a failed update back to the last working state by itself. N
 
 2. Act on the stack status:
 
-   | Stack status                                  | What to do                                                                                                                                                                                                                                                                            |
-   | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-   | `UPDATE_ROLLBACK_COMPLETE`                    | Back on the previous version. If the error was transient (throttling, a timeout), rerun the job: `gh run rerun <run-id> --failed`. Otherwise fix the code in a new PR.                                                                                                                |
-   | `ROLLBACK_COMPLETE` (the first create failed) | The stack can't be updated. Delete it, then rerun the job: `aws cloudformation delete-stack --stack-name dev-CvTailor-Hello --profile cvt-dev`.                                                                                                                                       |
-   | `UPDATE_ROLLBACK_FAILED`                      | CloudFormation couldn't undo a resource. Fix the cause shown in the events, then `aws cloudformation continue-update-rollback --stack-name dev-CvTailor-Hello --profile cvt-dev`. Skipping resources with `--resources-to-skip` is a last resort, because it leaves them out of sync. |
-   | `*_IN_PROGRESS`                               | Wait. The workflow never cancels a running deploy (`cancel-in-progress: false`).                                                                                                                                                                                                      |
+   | Stack status                                  | What to do                                                                                                                                                                                                                                                                 |
+   | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+   | `UPDATE_ROLLBACK_COMPLETE`                    | Back on the previous version. If the error was transient (throttling, a timeout), rerun the job: `gh run rerun <run-id> --failed`. Otherwise fix the code in a new PR.                                                                                                     |
+   | `ROLLBACK_COMPLETE` (the first create failed) | The stack can't be updated. Delete it, then rerun the job: `aws cloudformation delete-stack --stack-name dev-Web --profile cvt-dev`.                                                                                                                                       |
+   | `UPDATE_ROLLBACK_FAILED`                      | CloudFormation couldn't undo a resource. Fix the cause shown in the events, then `aws cloudformation continue-update-rollback --stack-name dev-Web --profile cvt-dev`. Skipping resources with `--resources-to-skip` is a last resort, because it leaves them out of sync. |
+   | `*_IN_PROGRESS`                               | Wait. The workflow never cancels a running deploy (`cancel-in-progress: false`).                                                                                                                                                                                           |
 
 3. CI-only errors:
 
@@ -230,13 +232,13 @@ Then still open the revert PR above. The next merge to `main` redeploys whatever
 
 ### Rollback restores infrastructure, not data
 
-A rollback puts resources back to their earlier definition. It doesn't bring back deleted data. Today `dev` has no data stores, so this is safe. When DynamoDB tables and S3 buckets are added, they need a retain removal policy and point-in-time recovery or versioning, and this runbook needs a data restore section.
+A rollback puts resources back to their earlier definition. It doesn't bring back deleted data. Today `dev` has no data stores (the web bucket holds only build output, which every deploy uploads again), so this is safe. When DynamoDB tables and S3 buckets that hold data are added, they need a retain removal policy and point-in-time recovery or versioning, and this runbook needs a data restore section.
 
 ## Verify
 
 - `pnpm --filter infra exec cdk diff 'dev/*' --profile cvt-dev` prints `There were no differences` on `main`.
 - The latest `CI` run on `main` is green, including `deploy-dev / deploy`: `gh run list --workflow ci.yml --branch main --limit 1`.
-- `describe-stacks` shows `dev-CvTailor-Hello` with its output, as in [step 1](#1-normal-deploy-ci).
+- `describe-stacks` shows `dev-Web` as complete, and `https://dev.cv.ikiwii.com/` returns `200`, as in [step 1](#1-normal-deploy-ci).
 - `pnpm --filter infra exec cdk diff 'prod-dns/*' --profile cvt-prod` and `pnpm --filter infra exec cdk diff 'dev-dns/*' --profile cvt-dev` print `There were no differences` on `main`.
 
 ## If it fails
