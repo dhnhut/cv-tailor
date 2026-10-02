@@ -21,7 +21,7 @@ const EXPECTED: Record<EnvironmentName, { stages: string[]; stacks: string[] }> 
   dev: {
     stages: ['dev', 'dev-access', 'dev-baseline', 'dev-dns'],
     stacks: [
-      'dev-CvTailor-Hello',
+      'dev-Web',
       'dev-access-GithubOidc',
       'dev-baseline-Budget',
       'dev-dns-Zone',
@@ -30,16 +30,11 @@ const EXPECTED: Record<EnvironmentName, { stages: string[]; stacks: string[] }> 
   },
   stag: {
     stages: ['stag', 'stag-access', 'stag-baseline'],
-    stacks: ['stag-CvTailor-Hello', 'stag-access-GithubOidc', 'stag-baseline-Budget'],
+    stacks: ['stag-Web', 'stag-access-GithubOidc', 'stag-baseline-Budget'],
   },
   prod: {
     stages: ['prod', 'prod-access', 'prod-baseline', 'prod-dns'],
-    stacks: [
-      'prod-CvTailor-Hello',
-      'prod-access-GithubOidc',
-      'prod-baseline-Budget',
-      'prod-dns-Zone',
-    ],
+    stacks: ['prod-Web', 'prod-access-GithubOidc', 'prod-baseline-Budget', 'prod-dns-Zone'],
   },
 };
 
