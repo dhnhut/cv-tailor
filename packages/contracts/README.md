@@ -1,6 +1,6 @@
 # @cv-tailor/contracts
 
-The single source of truth for payloads shared between the TypeScript API (`apps/api`) and the Python agent service (`services/agents`).
+The single source of truth for payloads shared between parts of CV Tailor: the TypeScript API (`apps/api`), the Python agent service (`services/agents`), the web app (`apps/web`), and the CDK app (`infra`).
 
 Contracts are written once, as [Zod](https://zod.dev) schemas. Everything else is generated from them.
 
@@ -18,6 +18,8 @@ services/agents/src/cv_tailor_agents/contracts/*.py   ← generated Pydantic v2,
 | ----------------- | -------------------------------------------------------------------------------- | ------------------------------------------ |
 | `apps/api` (TS)   | The Zod schema directly: `import { HealthResponse } from '@cv-tailor/contracts'` | Compile time (type) and runtime (`.parse`) |
 | `services/agents` | The generated Pydantic model                                                     | Runtime (`model_validate`) and mypy        |
+| `apps/web` (TS)   | `WebConfig`, to check `/config.json` before the app starts                       | Compile time (type) and runtime (`.parse`) |
+| `infra` (TS)      | The `WebConfig` type, for the `config.json` that CDK writes                      | Compile time (type)                        |
 
 The reasons for this design, and the tools that were compared, are recorded in [ADR-0003](../../docs/adr/0003-contracts-codegen.md).
 
@@ -60,25 +62,27 @@ Run these from the repo root.
 5. Add the same valid and invalid cases to `services/agents/tests/test_contracts.py`, so both languages are proven to agree.
 6. Commit the Zod source **and** the generated files together.
 
+A contract that only TypeScript reads, such as `WebConfig`, skips the `.register(...)` line and steps 4–5: nothing is generated for it.
+
 To use one contract inside another, reference the schema as usual (`job: JobDescription`). Generation writes a `$ref` to `job_description.json`, and Python imports the shared class instead of duplicating it.
 
 ## Conventions
 
-| Rule                                                 | Why                                                                                                                                                                                                              |
-| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| The schema `const` and its type share one name.      | TypeScript keeps values and types in separate namespaces, so one import gives both. The name also matches the Python class.                                                                                      |
-| The `id` is PascalCase and equal to the export name. | The `id` becomes the JSON Schema `title`, which becomes the Python class name. The file name is the `id` in snake_case, which becomes the Python module name.                                                    |
-| Use `z.strictObject`, never `z.object`.              | `z.object` silently strips unknown keys, but the generated Pydantic model (`extra="forbid"`) rejects them. `strictObject` makes both sides reject.                                                               |
-| Add `.describe()` to contracts and to fields.        | Descriptions become JSON Schema `description`, then Python docstrings and `Field(description=...)`.                                                                                                              |
-| Only use Zod features that JSON Schema can express.  | Not allowed: `.transform()`, `.refine()` / `.superRefine()`, `z.date()`, `z.bigint()`, `z.custom()`. Generation runs with `unrepresentable: 'throw'`, so it fails instead of silently weakening the Python side. |
-| Every schema must be registered in `contracts`.      | Only registered schemas are generated. A test checks the registration, so a missing `.register(...)` is caught early.                                                                                            |
-| Never edit generated files by hand.                  | The next `pnpm run generate` overwrites them, and `contracts:check` fails until the source matches.                                                                                                              |
+| Rule                                                    | Why                                                                                                                                                                                                                                                      |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The schema `const` and its type share one name.         | TypeScript keeps values and types in separate namespaces, so one import gives both. The name also matches the Python class.                                                                                                                              |
+| The `id` is PascalCase and equal to the export name.    | The `id` becomes the JSON Schema `title`, which becomes the Python class name. The file name is the `id` in snake_case, which becomes the Python module name.                                                                                            |
+| Use `z.strictObject`, never `z.object`.                 | `z.object` silently strips unknown keys, but the generated Pydantic model (`extra="forbid"`) rejects them. `strictObject` makes both sides reject.                                                                                                       |
+| Add `.describe()` to contracts and to fields.           | Descriptions become JSON Schema `description`, then Python docstrings and `Field(description=...)`.                                                                                                                                                      |
+| Only use Zod features that JSON Schema can express.     | Not allowed: `.transform()`, `.refine()` / `.superRefine()`, `z.date()`, `z.bigint()`, `z.custom()`. Generation runs with `unrepresentable: 'throw'`, so it fails instead of silently weakening the Python side.                                         |
+| Register every schema that Python reads in `contracts`. | Only registered schemas are generated. A test checks the registration, so a missing `.register(...)` is caught early. A contract that only TypeScript reads isn't registered, and its test checks that it isn't, so no unused Python model is generated. |
+| Never edit generated files by hand.                     | The next `pnpm run generate` overwrites them, and `contracts:check` fails until the source matches.                                                                                                                                                      |
 
 ## How the package is consumed
 
 The package has no build step. `package.json` `exports` points at `src/index.ts`, and TypeScript source is read directly:
 
-- `tsc` and Vitest in `apps/api` read the `.ts` files. Consumers need `allowImportingTsExtensions` and `erasableSyntaxOnly` in their tsconfig, because the source uses `.ts` import paths.
+- `tsc` in every consumer, Vitest in `apps/api` and `apps/web`, and Vite's build in `apps/web` read the `.ts` files. Consumers need `allowImportingTsExtensions` and `erasableSyntaxOnly` in their tsconfig, because the source uses `.ts` import paths.
 - `scripts/generate.ts` runs on Node 24's built-in type stripping (`node scripts/generate.ts`), the same way `infra` runs CDK.
 
 ## Files
