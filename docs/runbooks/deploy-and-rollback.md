@@ -6,7 +6,7 @@ How CV Tailor's infrastructure gets to AWS, how to preview and recover a deploy,
 
 - Checking that a merge reached `dev`.
 - Previewing what a change will do before merging it.
-- Changing the GitHub OIDC role or a budget (laptop-only stages).
+- Changing the GitHub OIDC role, a budget, or DNS (laptop-only stages).
 - Setting up a new environment account.
 - A deploy failed, or a deploy succeeded but broke something.
 
@@ -19,19 +19,20 @@ How CV Tailor's infrastructure gets to AWS, how to preview and recover a deploy,
 
 ## What deploys where
 
-The CDK app has three stages for each environment. Each stage is deployed separately.
+The CDK app has three stages for each environment, plus a DNS stage for `dev` and `prod`. Each stage is deployed separately.
 
-| Stage            | Stacks (CloudFormation name)                                        | Deployed by                               | When                           |
-| ---------------- | ------------------------------------------------------------------- | ----------------------------------------- | ------------------------------ |
-| `<env>`          | The workload: `<env>-CvTailor-Hello` today                          | CI (`dev` only, on every merge to `main`) | Every merge                    |
-| `<env>-access`   | `<env>-access-GithubOidc`: the OIDC provider and `GithubDeployRole` | Laptop only                               | Only when the CI trust changes |
-| `<env>-baseline` | `<env>-baseline-Budget`: the monthly budget                         | Laptop only                               | Only when the budget changes   |
+| Stage            | Stacks (CloudFormation name)                                                                                                                                                                      | Deployed by                               | When                                                 |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- | ---------------------------------------------------- |
+| `<env>`          | The workload: `<env>-CvTailor-Hello` today                                                                                                                                                        | CI (`dev` only, on every merge to `main`) | Every merge                                          |
+| `<env>-access`   | `<env>-access-GithubOidc`: the OIDC provider and `GithubDeployRole`                                                                                                                               | Laptop only                               | Only when the CI trust changes                       |
+| `<env>-baseline` | `<env>-baseline-Budget`: the monthly budget                                                                                                                                                       | Laptop only                               | Only when the budget changes                         |
+| `<env>-dns`      | `<env>-dns-Zone`: the hosted zone and its delegation records. `<env>-dns-Certificate` (`dev` only today): the certificate for `<host>` and `*.<host>` ([ADR-0008](../adr/0008-domain-and-dns.md)) | Laptop only                               | Only when a zone, delegation, or certificate changes |
 
 Rules:
 
-- **Never deploy with `'**'`.** Always name one stage, for example `'dev/*'`. CI must never be able to change the role it signs in with, or the budget that watches it (ADR-0004 §4).
-- `stag` and `prod` have no workload yet (Sprint 1 scope). Only their `-access` and `-baseline` stages exist.
-- `CDKToolkit`, `<env>-access-GithubOidc`, and `<env>-baseline-Budget` have termination protection. Deleting one needs `aws cloudformation update-termination-protection --no-enable-termination-protection` first, and should almost never happen.
+- **Never deploy with `'**'`.** Always name one stage, for example `'dev/*'`. CI must never be able to change the role it signs in with, the budget that watches it, or DNS (ADR-0004 §4, ADR-0008).
+- `stag` and `prod` have no workload yet. `prod` has its `-dns` stage; `stag` gets one with the release path (slice R).
+- `CDKToolkit`, `<env>-access-GithubOidc`, `<env>-baseline-Budget`, `<env>-dns-Zone`, and `<env>-dns-Certificate` have termination protection. Deleting one needs `aws cloudformation update-termination-protection --no-enable-termination-protection` first, and should almost never happen. A deleted zone stack leaves its hosted zone in place (retained).
 
 ## 1. Normal deploy (CI)
 
@@ -62,7 +63,7 @@ pnpm --filter infra exec cdk diff 'dev/*' --profile cvt-dev
 
 `There were no differences` means the merge won't change `dev`. Read every `[-]` (removed) and `[~]` (replaced) resource carefully. A replaced resource with data in it loses the data.
 
-## 3. Laptop-only deploys (`-access` and `-baseline`)
+## 3. Laptop-only deploys (`-access`, `-baseline`, and `-dns`)
 
 Example: changing the `dev` budget.
 
@@ -81,6 +82,51 @@ aws iam get-role --role-name GithubDeployRole --profile cvt-dev \
 ```
 
 Expected: `aud` is `sts.amazonaws.com` and `sub` is exactly `repo:dhnhut@5567608/cv-tailor@1386961484:environment:dev`. This is GitHub's immutable subject format, which includes the owner and repository IDs. A `sub` without the `@<id>` parts never matches, and the job fails at the credentials step.
+
+### DNS zones and certificates (`-dns`)
+
+The zone stack writes the hosted zone ID to SSM (`/cv-tailor/dns/zone-id`), and the certificate stack writes the certificate ARN (`/cv-tailor/dns/certificate-arn`). Other stacks read them at deploy time, so no stack depends on another through a CloudFormation export.
+
+First setup, in this order. Each step waits for the one before it ([ADR-0008](../adr/0008-domain-and-dns.md)).
+
+1. Create the `prod` zone:
+
+   ```bash
+   pnpm --filter infra exec cdk deploy 'prod-dns/Zone' --profile cvt-prod
+   ```
+
+   The stack prints its four name servers (the `NameServers` output). At the registrar of `ikiwii.com`, add four `NS` records for the host `cv`, one per name server.
+
+2. Create the `dev` zone:
+
+   ```bash
+   pnpm --filter infra exec cdk deploy 'dev-dns/Zone' --profile cvt-dev
+   ```
+
+3. Delegate `dev.cv.ikiwii.com`. Copy the four name servers from step 2 into the `dev.cv.ikiwii.com` entry of `DNS.prod.delegations` in `infra/config/environments.ts`, commit, and deploy the `prod` zone again. It adds the `NS` records for `dev`:
+
+   ```bash
+   pnpm --filter infra exec cdk deploy 'prod-dns/Zone' --profile cvt-prod
+   ```
+
+4. When `dig NS dev.cv.ikiwii.com +short` returns the four name servers from step 2, create the certificate. ACM checks its validation record through public DNS, so it can't be issued before the delegation works. The deploy waits until the certificate is issued, usually a few minutes:
+
+   ```bash
+   pnpm --filter infra exec cdk deploy 'dev-dns/Certificate' --profile cvt-dev
+   ```
+
+Check:
+
+```bash
+dig NS cv.ikiwii.com +short
+dig NS dev.cv.ikiwii.com +short
+aws acm list-certificates --profile cvt-dev \
+  --query "CertificateSummaryList[?DomainName=='dev.cv.ikiwii.com'].Status" --output text
+```
+
+Expected: the four name servers of each zone, and `ISSUED`. Where `dig` isn't installed (the devcontainer), ask a public resolver over HTTPS instead: `curl -s 'https://dns.google/resolve?name=dev.cv.ikiwii.com&type=NS'`.
+
+A new zone gets new name servers, so a zone that is deleted and created again breaks the delegation above it. Repeat step 1 (registrar) or step 3 (parent zone) for that zone.
 
 ## 4. Set up a new environment account
 
@@ -150,7 +196,7 @@ CloudFormation rolls a failed update back to the last working state by itself. N
 
    | Error in the job log                                                                                                            | Cause and fix                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
    | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-   | `Not authorized to perform sts:AssumeRoleWithWebIdentity`                                                                       | The job's Environment or branch doesn't match the role trust. Check that the job runs in the `dev` Environment from `main`, and check the trust as in [step 3](#3-laptop-only-deploys--access-and--baseline).                                                                                                                                                                                                                                                                                                                                                                                                |
+   | `Not authorized to perform sts:AssumeRoleWithWebIdentity`                                                                       | The job's Environment or branch doesn't match the role trust. Check that the job runs in the `dev` Environment from `main`, and check the trust as in [step 3](#3-laptop-only-deploys--access--baseline-and--dns).                                                                                                                                                                                                                                                                                                                                                                                           |
    | `Missing or invalid settings: CVT_…`                                                                                            | A secret is missing from the `dev` Environment: `gh secret list --env dev`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
    | `BootstrapVersionSsmConfirmationFailed … not authorized to perform: ssm:GetParameter … because no identity-based policy allows` | Usually `EmergencyDeny` is attached to the account, which is expected during an incident ([budget alarm runbook](budget-alarm.md#5-emergency-stop)). The SCP denies `GithubDeployRole` when it assumes the CDK deploy role, CDK falls back to the role's own credentials, and those have no SSM permission, so the log shows this error instead of the SCP one. To confirm, look for `sts:AssumeRole` with `explicit deny in a service control policy` in CloudTrail: `aws cloudtrail lookup-events --lookup-attributes AttributeKey=EventName,AttributeValue=AssumeRole --max-results 5 --profile cvt-dev`. |
 
@@ -191,6 +237,7 @@ A rollback puts resources back to their earlier definition. It doesn't bring bac
 - `pnpm --filter infra exec cdk diff 'dev/*' --profile cvt-dev` prints `There were no differences` on `main`.
 - The latest `CI` run on `main` is green, including `deploy-dev / deploy`: `gh run list --workflow ci.yml --branch main --limit 1`.
 - `describe-stacks` shows `dev-CvTailor-Hello` with its output, as in [step 1](#1-normal-deploy-ci).
+- `pnpm --filter infra exec cdk diff 'prod-dns/*' --profile cvt-prod` and `pnpm --filter infra exec cdk diff 'dev-dns/*' --profile cvt-dev` print `There were no differences` on `main`.
 
 ## If it fails
 

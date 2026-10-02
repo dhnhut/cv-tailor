@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import {
+  DNS,
+  HOST,
   PLACEHOLDER_ACCOUNT_ID,
   PLACEHOLDER_ALERT_EMAIL,
   PLACEHOLDER_FLAG,
@@ -17,13 +19,16 @@ describe('loadEnvironments', () => {
         name: 'dev',
         account: '111111111111',
         region: REGION,
+        host: 'dev.cv.ikiwii.com',
         alertEmail: EMAIL,
         monthlyBudgetUsd: 5,
+        dns: DNS.dev,
       },
       {
         name: 'stag',
         account: '222222222222',
         region: REGION,
+        host: 'stag.cv.ikiwii.com',
         alertEmail: EMAIL,
         monthlyBudgetUsd: 5,
       },
@@ -31,10 +36,18 @@ describe('loadEnvironments', () => {
         name: 'prod',
         account: '333333333333',
         region: REGION,
+        host: 'cv.ikiwii.com',
         alertEmail: EMAIL,
         monthlyBudgetUsd: 10,
+        dns: DNS.prod,
       },
     ]);
+  });
+
+  test('leaves the dns key out, not undefined, for an environment without a DNS stage', () => {
+    const stag = loadEnvironments(TEST_ENV).find((c) => c.name === 'stag');
+
+    expect(stag).not.toHaveProperty('dns');
   });
 
   test('names every missing variable, with its rule, in one error', () => {
@@ -76,4 +89,35 @@ describe('loadEnvironments', () => {
       expect(config.alertEmail).toBe(PLACEHOLDER_ALERT_EMAIL);
     }
   });
+});
+
+describe('DNS settings (S2-03, ADR-0008)', () => {
+  test('each environment has its own host under cv.ikiwii.com', () => {
+    expect(HOST).toEqual({
+      dev: 'dev.cv.ikiwii.com',
+      stag: 'stag.cv.ikiwii.com',
+      prod: 'cv.ikiwii.com',
+    });
+  });
+
+  test('dev and prod have a DNS stage, and only dev has a certificate', () => {
+    expect(Object.keys(DNS).sort()).toEqual(['dev', 'prod']);
+    expect(DNS.dev?.certificate).toBe(true);
+    expect(DNS.prod?.certificate).toBe(false);
+  });
+
+  // Name servers are copied by hand from a stack output (deploy runbook, step 3),
+  // so a typo or a zone delegated from the wrong parent fails here.
+  test.each(Object.entries(DNS))(
+    'every delegation from %s is a child zone with four Route 53 name servers',
+    (name, dns) => {
+      for (const { zoneName, nameServers } of dns.delegations) {
+        expect(zoneName.endsWith(`.${HOST[name as keyof typeof HOST]}`)).toBe(true);
+        expect(nameServers).toHaveLength(4);
+        for (const nameServer of nameServers) {
+          expect(nameServer).toMatch(/^ns-\d+\.awsdns-\d+\.(com|net|org|co\.uk)\.?$/);
+        }
+      }
+    },
+  );
 });

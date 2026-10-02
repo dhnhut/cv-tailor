@@ -1,11 +1,11 @@
 import { Stage } from 'aws-cdk-lib';
 import { describe, expect, test } from 'vitest';
-import { REGION, loadEnvironments } from '../config/environments.ts';
+import { REGION, loadEnvironments, type EnvironmentName } from '../config/environments.ts';
 import { createApp } from '../lib/app.ts';
 import { TEST_APP_PROPS, TEST_ENV } from './test-app.ts';
 
-// Every stage (workload, access, and baseline) synthesises and pins us-east-1
-// (S1-06, S1-07, S1-09, ADR-0002 verification step 2).
+// Every stage (workload, access, baseline, and DNS) synthesises and pins us-east-1
+// (S1-06, S1-07, S1-09, S2-03, ADR-0002 verification step 2).
 // The app comes from createApp(), the same wiring bin/infra.ts uses, so a stage dropped
 // from the real app fails here.
 // IDs come from a fake env, never process.env, so a developer's infra/.env doesn't matter.
@@ -15,7 +15,33 @@ const app = createApp(TEST_ENV, TEST_APP_PROPS);
 
 const REGION_PATTERN = /\b[a-z]{2}(?:-gov)?-[a-z]+-\d\b/g;
 
-const stageIds = (name: string): string[] => [name, `${name}-access`, `${name}-baseline`];
+// Written out literally, so a stage or stack added, dropped, or renamed fails here.
+// stag has no DNS stage until the release path (slice R).
+const EXPECTED: Record<EnvironmentName, { stages: string[]; stacks: string[] }> = {
+  dev: {
+    stages: ['dev', 'dev-access', 'dev-baseline', 'dev-dns'],
+    stacks: [
+      'dev-CvTailor-Hello',
+      'dev-access-GithubOidc',
+      'dev-baseline-Budget',
+      'dev-dns-Zone',
+      'dev-dns-Certificate',
+    ],
+  },
+  stag: {
+    stages: ['stag', 'stag-access', 'stag-baseline'],
+    stacks: ['stag-CvTailor-Hello', 'stag-access-GithubOidc', 'stag-baseline-Budget'],
+  },
+  prod: {
+    stages: ['prod', 'prod-access', 'prod-baseline', 'prod-dns'],
+    stacks: [
+      'prod-CvTailor-Hello',
+      'prod-access-GithubOidc',
+      'prod-baseline-Budget',
+      'prod-dns-Zone',
+    ],
+  },
+};
 
 // findChild throws if the stage is missing.
 const synthStage = (id: string) => {
@@ -24,23 +50,19 @@ const synthStage = (id: string) => {
   return stage.synth();
 };
 
-test('the app holds exactly the workload, access, and baseline stage of each environment', () => {
+test('the app holds exactly the expected stages of each environment', () => {
   expect(app.node.children.map((child) => child.node.id)).toEqual(
-    CONFIGS.flatMap((config) => stageIds(config.name)),
+    CONFIGS.flatMap((config) => EXPECTED[config.name].stages),
   );
 });
 
 describe.each(CONFIGS)('stages for $name', (config) => {
-  const stacks = stageIds(config.name)
+  const stacks = EXPECTED[config.name].stages
     .map(synthStage)
     .flatMap((assembly) => assembly.stacks);
 
-  test('synthesises the hello, GitHub OIDC, and budget stacks', () => {
-    expect(stacks.map((s) => s.stackName)).toEqual([
-      `${config.name}-CvTailor-Hello`,
-      `${config.name}-access-GithubOidc`,
-      `${config.name}-baseline-Budget`,
-    ]);
+  test('synthesises the expected stacks', () => {
+    expect(stacks.map((s) => s.stackName)).toEqual(EXPECTED[config.name].stacks);
   });
 
   test('pins every stack to its own account and us-east-1', () => {
@@ -56,4 +78,14 @@ describe.each(CONFIGS)('stages for $name', (config) => {
       expect(regions.filter((r) => r !== REGION)).toEqual([]);
     }
   });
+});
+
+// The certificate stack reads the zone ID from SSM, which CDK can't see as a dependency,
+// so `cdk deploy 'dev-dns/*'` relies on the explicit one.
+test('the dev certificate stack deploys after the dev zone stack', () => {
+  const { stacks } = synthStage('dev-dns');
+  const zone = stacks.find((s) => s.stackName === 'dev-dns-Zone');
+  const certificate = stacks.find((s) => s.stackName === 'dev-dns-Certificate');
+
+  expect(certificate?.dependencies.map((d) => d.id)).toContain(zone?.id);
 });

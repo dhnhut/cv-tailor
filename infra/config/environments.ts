@@ -43,12 +43,43 @@ export const ALERT_EMAIL_VAR = 'CVT_ALERT_EMAIL';
 export const PLACEHOLDER_ALERT_EMAIL = 'alerts@example.com';
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// The web app's host in each environment (ADR-0008). The API and the sign-in pages
+// use api.<host> and auth.<host>.
+export const HOST: Record<EnvironmentName, string> = {
+  dev: 'dev.cv.ikiwii.com',
+  stag: 'stag.cv.ikiwii.com',
+  prod: 'cv.ikiwii.com',
+};
+
+// A child zone delegated from an environment's zone (ADR-0008). Name servers are public
+// DNS data, so they are committed. They come from the child zone stack's NameServers
+// output after its first deploy (deploy runbook, step 3).
+export interface ZoneDelegation {
+  readonly zoneName: string;
+  readonly nameServers: readonly string[];
+}
+
+// An environment's <env>-dns stage (S2-03): its hosted zone for <host>, the child zones it
+// delegates, and whether it has a certificate for <host> and *.<host>.
+export interface DnsConfig {
+  readonly certificate: boolean;
+  readonly delegations: readonly ZoneDelegation[];
+}
+
+// stag gets its zone, and prod its certificate, with the release path (slice R, ADR-0005).
+export const DNS: Partial<Record<EnvironmentName, DnsConfig>> = {
+  dev: { certificate: true, delegations: [] },
+  prod: { certificate: false, delegations: [] },
+};
+
 export interface EnvironmentConfig {
   readonly name: EnvironmentName;
   readonly account: string;
   readonly region: typeof REGION;
+  readonly host: string;
   readonly monthlyBudgetUsd: number;
   readonly alertEmail: string;
+  readonly dns?: DnsConfig; // absent: the environment has no DNS stage yet
 }
 
 // Check for missing or invalid environment variables.
@@ -88,11 +119,16 @@ export function loadEnvironments(
 
   checkConfigProblems(env, placeholder);
 
-  return ENVIRONMENT_NAMES.map((name) => ({
-    name,
-    account: placeholder ? PLACEHOLDER_ACCOUNT_ID : (env[accountIdVar(name)] as string),
-    region: REGION,
-    monthlyBudgetUsd: MONTHLY_BUDGET_USD[name],
-    alertEmail: placeholder ? PLACEHOLDER_ALERT_EMAIL : (env[ALERT_EMAIL_VAR] as string),
-  }));
+  return ENVIRONMENT_NAMES.map((name) => {
+    const dns = DNS[name];
+    return {
+      name,
+      account: placeholder ? PLACEHOLDER_ACCOUNT_ID : (env[accountIdVar(name)] as string),
+      region: REGION,
+      host: HOST[name],
+      monthlyBudgetUsd: MONTHLY_BUDGET_USD[name],
+      alertEmail: placeholder ? PLACEHOLDER_ALERT_EMAIL : (env[ALERT_EMAIL_VAR] as string),
+      ...(dns ? { dns } : {}),
+    };
+  });
 }
