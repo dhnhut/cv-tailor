@@ -183,7 +183,7 @@ Steps 8, 11, and 12 need only the repo and the `dev` account, so they can run wh
 ## Sprint Review
 
 - **Done:**
-  - S2-02: [ADR-0009](../adr/0009-sign-in-and-api-access.md) is accepted. Every person is a local email user, and Google identities are always linked into it, so a person's `sub` never changes. Linking follows nine cases, including the takeover case. The MVP uses the Essentials plan, the authorization code flow with PKCE, tokens held by the browser, and a REST API that accepts access tokens only. `AGENTS.md` §4.1, §7, §8, and §12 and ADR-0005 are updated (PR #TBD).
+  - S2-02: [ADR-0009](../adr/0009-sign-in-and-api-access.md) is accepted. Every person is a local email user, and Google identities are always linked into it, so a person's `sub` never changes. Linking follows nine cases, including the takeover case. The MVP uses the Essentials plan, the authorization code flow with PKCE, tokens held by the browser, and a REST API that accepts access tokens only. `AGENTS.md` §4.1, §7, §8, and §12 and ADR-0005 are updated (PR #29).
 - **Not done / carried over:**
 - **What changed and why:**
   - S2-02: managed login's sign-up link can't be hidden while self-registration is on, because the link disappears only when self-registration is off, which also blocks the `SignUp` API. The link stays. Once Turnstile is required, sign-ups made there are refused with a message that points to the web app's sign-up form.

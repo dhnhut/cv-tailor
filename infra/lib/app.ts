@@ -3,6 +3,7 @@ import { loadEnvironments } from '../config/environments.ts';
 import { AccessStage } from './access-stage.ts';
 import { BaselineStage } from './baseline-stage.ts';
 import { CvTailorStage } from './cv-tailor-stage.ts';
+import { DnsStage } from './dns-stage.ts';
 
 // Builds every stage for every environment. bin/infra.ts and the tests share this, so
 // tests check the same wiring that `cdk synth` runs.
@@ -15,6 +16,9 @@ export function createApp(
     new CvTailorStage(app, config.name, { config });
     new AccessStage(app, `${config.name}-access`, { config });
     new BaselineStage(app, `${config.name}-baseline`, { config });
+    if (config.dns) {
+      new DnsStage(app, `${config.name}-dns`, { config, dns: config.dns });
+    }
   }
   return app;
 }
