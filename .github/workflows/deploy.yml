@@ -46,6 +46,10 @@ jobs:
           restore-keys: pnpm-store-${{ runner.os }}-
       - run: pnpm install --frozen-lockfile
 
+      # Before AWS credentials, like install: the build runs third-party code (Vite and its plugins).
+      - name: Build the web app (the dev stage uploads apps/web/dist)
+        run: pnpm --filter @cv-tailor/web run build
+
       # After install, so dependency install scripts never see AWS credentials.
       - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
