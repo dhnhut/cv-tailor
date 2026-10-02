@@ -51,6 +51,10 @@ export const HOST: Record<EnvironmentName, string> = {
   prod: 'cv.ikiwii.com',
 };
 
+// The Vite dev server (apps/web). Only dev's app client accepts it as a sign-in callback, so the
+// web app on a laptop can sign in against dev (ADR-0009 §5).
+export const LOCAL_WEB_ORIGIN = 'http://localhost:5173';
+
 // A child zone delegated from an environment's zone (ADR-0008). Name servers are public
 // DNS data, so they are committed. They come from the child zone stack's NameServers
 // output after its first deploy (deploy runbook, step 3).
@@ -94,6 +98,7 @@ export interface EnvironmentConfig {
   readonly monthlyBudgetUsd: number;
   readonly alertEmail: string;
   readonly dns?: DnsConfig; // absent: the environment has no DNS stage yet
+  readonly webOrigins: readonly string[]; // where the web app runs, for sign-in callbacks (S2-05)
 }
 
 // Check for missing or invalid environment variables.
@@ -140,6 +145,8 @@ export function loadEnvironments(
       account: placeholder ? PLACEHOLDER_ACCOUNT_ID : (env[accountIdVar(name)] as string),
       region: REGION,
       host: HOST[name],
+      webOrigins: [`https://${HOST[name]}`, ...(name === 'dev' ? [LOCAL_WEB_ORIGIN] : [])],
+
       monthlyBudgetUsd: MONTHLY_BUDGET_USD[name],
       alertEmail: placeholder ? PLACEHOLDER_ALERT_EMAIL : (env[ALERT_EMAIL_VAR] as string),
       ...(dns ? { dns } : {}),

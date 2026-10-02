@@ -21,7 +21,9 @@ const EXPECTED: Record<EnvironmentName, { stages: string[]; stacks: string[] }> 
   dev: {
     stages: ['dev', 'dev-access', 'dev-baseline', 'dev-dns'],
     stacks: [
+      'dev-Auth',
       'dev-Web',
+      'dev-AuthDomain',
       'dev-access-GithubOidc',
       'dev-baseline-Budget',
       'dev-dns-Zone',
@@ -30,11 +32,24 @@ const EXPECTED: Record<EnvironmentName, { stages: string[]; stacks: string[] }> 
   },
   stag: {
     stages: ['stag', 'stag-access', 'stag-baseline'],
-    stacks: ['stag-Web', 'stag-access-GithubOidc', 'stag-baseline-Budget'],
+    stacks: [
+      'stag-Auth',
+      'stag-Web',
+      'stag-AuthDomain',
+      'stag-access-GithubOidc',
+      'stag-baseline-Budget',
+    ],
   },
   prod: {
     stages: ['prod', 'prod-access', 'prod-baseline', 'prod-dns'],
-    stacks: ['prod-Web', 'prod-access-GithubOidc', 'prod-baseline-Budget', 'prod-dns-Zone'],
+    stacks: [
+      'prod-Auth',
+      'prod-Web',
+      'prod-AuthDomain',
+      'prod-access-GithubOidc',
+      'prod-baseline-Budget',
+      'prod-dns-Zone',
+    ],
   },
 };
 
@@ -83,4 +98,22 @@ test('the dev certificate stack deploys after the dev zone stack', () => {
   const certificate = stacks.find((s) => s.stackName === 'dev-dns-Certificate');
 
   expect(certificate?.dependencies.map((d) => d.id)).toContain(zone?.id);
+});
+
+// AuthDomain reads Auth's SSM parameters, which CDK can't see, and Cognito creates the custom
+// domain only when <host> (in Web) resolves (ADR-0008).
+test.each(CONFIGS)('the $name sign-in domain deploys after its auth and web stacks', (config) => {
+  const { stacks } = synthStage(config.name);
+  const stack = (name: string) => stacks.find((s) => s.stackName === `${config.name}-${name}`);
+
+  expect(stack('AuthDomain')?.dependencies.map((d) => d.id)).toEqual(
+    expect.arrayContaining([stack('Auth')?.id, stack('Web')?.id]),
+  );
+});
+
+// ADR-0009 §5: Cognito sends sign-in codes to localhost only in dev.
+test.each(CONFIGS)('only the dev app client accepts localhost callbacks ($name)', (config) => {
+  const auth = synthStage(config.name).stacks.find((s) => s.stackName === `${config.name}-Auth`);
+
+  expect(JSON.stringify(auth?.template).includes('http://localhost')).toBe(config.name === 'dev');
 });
