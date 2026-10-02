@@ -271,6 +271,12 @@ importers:
       '@cv-tailor/config':
         specifier: workspace:*
         version: link:../packages/config
+      '@cv-tailor/contracts':
+        specifier: workspace:*
+        version: link:../packages/contracts
+      '@cv-tailor/web':
+        specifier: workspace:*
+        version: link:../apps/web
       '@types/node':
         specifier: ^24.19.0
         version: 24.19.0

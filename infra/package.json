@@ -12,6 +12,8 @@
   },
   "devDependencies": {
     "@cv-tailor/config": "workspace:*",
+    "@cv-tailor/contracts": "workspace:*",
+    "@cv-tailor/web": "workspace:*",
     "@types/node": "^24.19.0",
     "@vitest/coverage-v8": "5.0.2",
     "aws-cdk": "^2.1143.0",
