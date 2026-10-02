@@ -1,11 +1,12 @@
 # ADR-0005: MVP Scope
 
-| Field       | Value         |
-| ----------- | ------------- |
-| Status      | Accepted      |
-| Date        | 2026-10-01    |
-| Deciders    | Project owner |
-| Sprint item | S1-13         |
+| Field       | Value                                                                                                                   |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Status      | Accepted                                                                                                                |
+| Date        | 2026-10-01                                                                                                              |
+| Amended     | 2026-10-02: CAPTCHA (Cloudflare Turnstile) moves from slice I into slice A ([ADR-0009](0009-sign-in-and-api-access.md)) |
+| Deciders    | Project owner                                                                                                           |
+| Sprint item | S1-13                                                                                                                   |
 
 ## Context
 
@@ -25,21 +26,21 @@ The work is grouped into **feature slices**. Each slice is a vertical piece of t
 
 Every requirement ID in `AGENTS.md` §4 and §6 belongs to exactly one slice. A requirement split across two slices names the part each slice covers.
 
-| Slice | Name                    | Contents                                                                                                                                                                                                             | Requirement IDs                                                                            |
-| ----- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| A     | Walking skeleton + auth | DNS and certificates on `ikiwii.com` ([ADR-0008](0008-domain-and-dns.md)), SPA on CloudFront, API Gateway with a Cognito authorizer, email/password and Google sign-in, account linking, `admin` group, first tables | AUTH-01, AUTH-02                                                                           |
-| B     | Cost guards             | Kill switch, max tokens per request, usage metered in USD, daily and monthly quota, admin quota, per-user override set by script                                                                                     | ADMIN-01, ADMIN-02, ADMIN-03, QUOTA-01, QUOTA-02, QUOTA-03 (candidate and admin), QUOTA-04 |
-| C     | Knowledge base          | Markdown content, presigned upload with a per-document ACL file, managed knowledge base sync, storage cap                                                                                                            | KB-01, KB-03, KB-04, KB-05, KB-06                                                          |
-| D     | Generation core         | JD as text, options, CV and cover letter as separate documents, async; JD Analyzer → Profile Matcher → Writers → Reviewer; Guardrails; PII redaction; evaluation benchmark                                           | GEN-01 (text), GEN-02, GEN-03, GEN-04, SAFE-01, SAFE-03, SAFE-04, SAFE-05, §5.5            |
-| E     | PDF export              | Export the final documents to PDF, not stored                                                                                                                                                                        | GEN-06                                                                                     |
-| F     | Style matching          | Writing samples upload and the Style Agent                                                                                                                                                                           | KB-02                                                                                      |
-| G     | Refinement conversation | Refine a draft through chat before export (AgentCore Memory)                                                                                                                                                         | GEN-05                                                                                     |
-| H     | JD from a link or file  | Public job post links (AgentCore Browser) and JD files (documents and images)                                                                                                                                        | GEN-01 (link), GEN-07                                                                      |
-| I     | Tiers and abuse         | Verification tier, CAPTCHA, API Gateway usage plans                                                                                                                                                                  | AUTH-03, QUOTA-03 (tiers), §8                                                              |
-| J     | Personal chatbot        | Chatbot on/off, chatbot page, match score, Q&A, per-headhunter quota, jailbreak and data-leak protection                                                                                                             | CHAT-01, CHAT-02, CHAT-03, CHAT-04, CHAT-05, CHAT-07, SAFE-02                              |
-| K     | Coupons                 | Coupons linked to an application                                                                                                                                                                                     | CHAT-06                                                                                    |
-| L     | Extra credit            | A way to get quota beyond the free amount                                                                                                                                                                            | Quota epic (no ID yet)                                                                     |
-| R     | Release path            | `stag` and `prod` promotion pipeline, the first `prod` deploy at `cv.ikiwii.com`, service checks in `stag` and `prod`                                                                                                | §10                                                                                        |
+| Slice | Name                    | Contents                                                                                                                                                                                                                                                        | Requirement IDs                                                                            |
+| ----- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| A     | Walking skeleton + auth | DNS and certificates on `ikiwii.com` ([ADR-0008](0008-domain-and-dns.md)), SPA on CloudFront, API Gateway with a Cognito authorizer, email/password and Google sign-in, account linking, `admin` group, first tables, CAPTCHA on sign-up (Cloudflare Turnstile) | AUTH-01, AUTH-02, §8 (CAPTCHA)                                                             |
+| B     | Cost guards             | Kill switch, max tokens per request, usage metered in USD, daily and monthly quota, admin quota, per-user override set by script                                                                                                                                | ADMIN-01, ADMIN-02, ADMIN-03, QUOTA-01, QUOTA-02, QUOTA-03 (candidate and admin), QUOTA-04 |
+| C     | Knowledge base          | Markdown content, presigned upload with a per-document ACL file, managed knowledge base sync, storage cap                                                                                                                                                       | KB-01, KB-03, KB-04, KB-05, KB-06                                                          |
+| D     | Generation core         | JD as text, options, CV and cover letter as separate documents, async; JD Analyzer → Profile Matcher → Writers → Reviewer; Guardrails; PII redaction; evaluation benchmark                                                                                      | GEN-01 (text), GEN-02, GEN-03, GEN-04, SAFE-01, SAFE-03, SAFE-04, SAFE-05, §5.5            |
+| E     | PDF export              | Export the final documents to PDF, not stored                                                                                                                                                                                                                   | GEN-06                                                                                     |
+| F     | Style matching          | Writing samples upload and the Style Agent                                                                                                                                                                                                                      | KB-02                                                                                      |
+| G     | Refinement conversation | Refine a draft through chat before export (AgentCore Memory)                                                                                                                                                                                                    | GEN-05                                                                                     |
+| H     | JD from a link or file  | Public job post links (AgentCore Browser) and JD files (documents and images)                                                                                                                                                                                   | GEN-01 (link), GEN-07                                                                      |
+| I     | Tiers and abuse         | Verification tier, API Gateway usage plans                                                                                                                                                                                                                      | AUTH-03, QUOTA-03 (tiers), §8 (except CAPTCHA)                                             |
+| J     | Personal chatbot        | Chatbot on/off, chatbot page, match score, Q&A, per-headhunter quota, jailbreak and data-leak protection                                                                                                                                                        | CHAT-01, CHAT-02, CHAT-03, CHAT-04, CHAT-05, CHAT-07, SAFE-02                              |
+| K     | Coupons                 | Coupons linked to an application                                                                                                                                                                                                                                | CHAT-06                                                                                    |
+| L     | Extra credit            | A way to get quota beyond the free amount                                                                                                                                                                                                                       | Quota epic (no ID yet)                                                                     |
+| R     | Release path            | `stag` and `prod` promotion pipeline, the first `prod` deploy at `cv.ikiwii.com`, service checks in `stag` and `prod`                                                                                                                                           | §10                                                                                        |
 
 Slice R has no requirement ID of its own, but nothing can be released without it.
 
@@ -70,16 +71,16 @@ Rejected, because it fails drivers 1, 2, and 3.
 
 ### MVP
 
-| Slice | Notes                                                                                                                                                           |
-| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A     | Google is the first OAuth provider. LinkedIn joins the MVP only if a time-boxed spike shows it works as a Cognito OIDC provider without a proxy or custom code. |
-| B     | Candidate: USD 0.10 per day and USD 0.50 per month. Admin: USD 1 per day and USD 5 per month.                                                                   |
-| C     | Storage cap: 50 MB per candidate.                                                                                                                               |
-| D     | A full generation must cost USD 0.10 or less, so it fits a candidate's daily quota.                                                                             |
-| E     | —                                                                                                                                                               |
-| F     | —                                                                                                                                                               |
-| H     | Links: public pages only, meaning pages that load without signing in. Files: `.doc`/`.docx`, `.pdf`, and images (`.png`, `.jpeg`, `.gif`, `.webp`).             |
-| R     | `prod` is served at `cv.ikiwii.com`, `stag` at `stag.cv.ikiwii.com`, and `dev` at `dev.cv.ikiwii.com` ([ADR-0008](0008-domain-and-dns.md)).                     |
+| Slice | Notes                                                                                                                                                                                                                                    |
+| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A     | Google is the first OAuth provider. LinkedIn joins the MVP only if a time-boxed spike shows it works as a Cognito OIDC provider without a proxy or custom code. The sign-up CAPTCHA is built before the first `prod` release (Sprint 6). |
+| B     | Candidate: USD 0.10 per day and USD 0.50 per month. Admin: USD 1 per day and USD 5 per month.                                                                                                                                            |
+| C     | Storage cap: 50 MB per candidate.                                                                                                                                                                                                        |
+| D     | A full generation must cost USD 0.10 or less, so it fits a candidate's daily quota.                                                                                                                                                      |
+| E     | —                                                                                                                                                                                                                                        |
+| F     | —                                                                                                                                                                                                                                        |
+| H     | Links: public pages only, meaning pages that load without signing in. Files: `.doc`/`.docx`, `.pdf`, and images (`.png`, `.jpeg`, `.gif`, `.webp`).                                                                                      |
+| R     | `prod` is served at `cv.ikiwii.com`, `stag` at `stag.cv.ikiwii.com`, and `dev` at `dev.cv.ikiwii.com` ([ADR-0008](0008-domain-and-dns.md)).                                                                                              |
 
 ### Order
 
@@ -89,7 +90,7 @@ Rejected, because it fails drivers 1, 2, and 3.
 | 3      | C, plus a first JD Analyzer on a JD given as text, behind the kill switch                                                                                             |
 | 4      | D: the full agent graph, the Reviewer, and the evaluation benchmark in CI                                                                                             |
 | 5      | F and H                                                                                                                                                               |
-| 6      | The rest of B (quota), E, R, hardening, and the first `prod` release                                                                                                  |
+| 6      | The rest of B (quota), E, R, the sign-up CAPTCHA, hardening, and the first `prod` release                                                                             |
 
 The kill switch and the per-request token limit come in Sprint 2, before the first AI call in Sprint 3. The full quota comes in Sprint 6, before the first `prod` release. Until then, AI features run only in `dev`, where the budget alarms and the emergency deny SCP apply.
 

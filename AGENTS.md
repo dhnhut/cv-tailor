@@ -56,11 +56,11 @@ Each requirement has an ID so sprint backlogs can refer to it.
 
 ### 4.1 Accounts and Authentication (AUTH)
 
-| ID      | Requirement                                                                                                                                                      |
-| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| AUTH-01 | A candidate can register for free.                                                                                                                               |
-| AUTH-02 | Sign-in uses Amazon Cognito with email/password and OAuth (Google at launch, LinkedIn planned). Sign-ins with the same verified email are linked to one account. |
-| AUTH-03 | Email verification is optional. A verified account gets a higher quota.                                                                                          |
+| ID      | Requirement                                                                                                                                                                                                                                                               |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AUTH-01 | A candidate can register for free.                                                                                                                                                                                                                                        |
+| AUTH-02 | Sign-in uses Amazon Cognito with email/password and OAuth (Google at launch, LinkedIn planned). Sign-ins with the same verified email are linked to one account. At launch, Google sign-in accepts Gmail addresses ([ADR-0009](docs/adr/0009-sign-in-and-api-access.md)). |
+| AUTH-03 | Email verification is optional. A verified account gets a higher quota.                                                                                                                                                                                                   |
 
 ### 4.2 Candidate Knowledge Base (KB)
 
@@ -192,11 +192,11 @@ An **evaluation benchmark** is required. It measures output quality and checks t
 | Layer                  | Technology                                                                                                                                                                                                  |
 | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Frontend               | Vite, React, TypeScript SPA, Tailwind CSS, served via CloudFront                                                                                                                                            |
-| API                    | AWS API Gateway                                                                                                                                                                                             |
+| API                    | AWS API Gateway REST API, with a Cognito authorizer that accepts access tokens only ([ADR-0009](docs/adr/0009-sign-in-and-api-access.md))                                                                   |
 | Backend                | Node.js 24, TypeScript, AWS Lambda (serverless)                                                                                                                                                             |
 | Database               | Amazon DynamoDB, a single table with an `Entity` attribute ([ADR-0006](docs/adr/0006-data-store.md))                                                                                                        |
 | File storage           | Amazon S3 (direct upload)                                                                                                                                                                                   |
-| Auth                   | Amazon Cognito                                                                                                                                                                                              |
+| Auth                   | Amazon Cognito (Essentials plan): managed login, email/password and Google sign-in with account linking, authorization code flow with PKCE ([ADR-0009](docs/adr/0009-sign-in-and-api-access.md))            |
 | AI agents              | Python 3.12, LangChain, LangGraph on Bedrock AgentCore                                                                                                                                                      |
 | Infrastructure as Code | AWS CDK                                                                                                                                                                                                     |
 | CI/CD                  | GitHub Actions (actions pinned to commit SHAs, updated by Dependabot)                                                                                                                                       |
@@ -213,15 +213,15 @@ An **evaluation benchmark** is required. It measures output quality and checks t
 
 The system must resist abuse, such as someone creating many free accounts to collect more quota. Controls are added step by step, from simple to layered:
 
-| Control                 | Purpose                                        |
-| ----------------------- | ---------------------------------------------- |
-| Email verification      | Unlocks a higher quota.                        |
-| CAPTCHA                 | Blocks automated sign-ups.                     |
-| API Gateway usage plans | Rate limiting and throttling.                  |
-| Per-user token quota    | Limits AI usage per user.                      |
-| Max tokens per request  | Limits the cost of a single call.              |
-| AWS Budgets alarms      | Monthly budget limit **for each environment**. |
-| Kill switch             | Turns off all AI calls immediately.            |
+| Control                        | Purpose                                        |
+| ------------------------------ | ---------------------------------------------- |
+| Email verification             | Unlocks a higher quota.                        |
+| CAPTCHA (Cloudflare Turnstile) | Blocks automated sign-ups.                     |
+| API Gateway usage plans        | Rate limiting and throttling.                  |
+| Per-user token quota           | Limits AI usage per user.                      |
+| Max tokens per request         | Limits the cost of a single call.              |
+| AWS Budgets alarms             | Monthly budget limit **for each environment**. |
+| Kill switch                    | Turns off all AI calls immediately.            |
 
 ---
 
@@ -265,20 +265,20 @@ The first release covers the candidate flow end to end. The reasons, the options
 
 ### In the MVP
 
-| Feature                              | Requirement IDs                                                                            |
-| ------------------------------------ | ------------------------------------------------------------------------------------------ |
-| Sign-in (email/password, Google)     | AUTH-01, AUTH-02                                                                           |
-| Cost guards and quota                | ADMIN-01, ADMIN-02, ADMIN-03, QUOTA-01, QUOTA-02, QUOTA-03 (candidate and admin), QUOTA-04 |
-| Knowledge base                       | KB-01, KB-03, KB-04, KB-05, KB-06                                                          |
-| CV and cover letter generation       | GEN-01, GEN-02, GEN-03, GEN-04, GEN-07, SAFE-01, SAFE-03, SAFE-04, SAFE-05, §5.5           |
-| Style matching                       | KB-02                                                                                      |
-| PDF export                           | GEN-06                                                                                     |
-| Release to `prod` at `cv.ikiwii.com` | §10                                                                                        |
+| Feature                                              | Requirement IDs                                                                            |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Sign-in (email/password, Google) and sign-up CAPTCHA | AUTH-01, AUTH-02, §8 (CAPTCHA)                                                             |
+| Cost guards and quota                                | ADMIN-01, ADMIN-02, ADMIN-03, QUOTA-01, QUOTA-02, QUOTA-03 (candidate and admin), QUOTA-04 |
+| Knowledge base                                       | KB-01, KB-03, KB-04, KB-05, KB-06                                                          |
+| CV and cover letter generation                       | GEN-01, GEN-02, GEN-03, GEN-04, GEN-07, SAFE-01, SAFE-03, SAFE-04, SAFE-05, §5.5           |
+| Style matching                                       | KB-02                                                                                      |
+| PDF export                                           | GEN-06                                                                                     |
+| Release to `prod` at `cv.ikiwii.com`                 | §10                                                                                        |
 
 ### Later releases, in order
 
 1. Refinement conversation (GEN-05)
-2. Tiers and abuse controls (AUTH-03, QUOTA-03 tiers, §8)
+2. Tiers and abuse controls (AUTH-03, QUOTA-03 tiers, §8 except CAPTCHA)
 3. Personal chatbot (CHAT-01 to CHAT-05, CHAT-07, SAFE-02)
 4. Coupons (CHAT-06)
 5. Extra credit beyond the free quota
