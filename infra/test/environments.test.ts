@@ -20,6 +20,7 @@ describe('loadEnvironments', () => {
         account: '111111111111',
         region: REGION,
         host: 'dev.cv.ikiwii.com',
+        webOrigins: ['https://dev.cv.ikiwii.com', 'http://localhost:5173'],
         alertEmail: EMAIL,
         monthlyBudgetUsd: 5,
         dns: DNS.dev,
@@ -29,6 +30,7 @@ describe('loadEnvironments', () => {
         account: '222222222222',
         region: REGION,
         host: 'stag.cv.ikiwii.com',
+        webOrigins: ['https://stag.cv.ikiwii.com'],
         alertEmail: EMAIL,
         monthlyBudgetUsd: 5,
       },
@@ -37,6 +39,7 @@ describe('loadEnvironments', () => {
         account: '333333333333',
         region: REGION,
         host: 'cv.ikiwii.com',
+        webOrigins: ['https://cv.ikiwii.com'],
         alertEmail: EMAIL,
         monthlyBudgetUsd: 10,
         dns: DNS.prod,
@@ -120,4 +123,17 @@ describe('DNS settings (S2-03, ADR-0008)', () => {
       }
     },
   );
+});
+
+describe('Sign-in origins (S2-05, ADR-0009)', () => {
+  // Cognito sends sign-in codes only to these origins.
+  test('each environment accepts only its own host, and only dev the local dev server', () => {
+    expect(
+      Object.fromEntries(loadEnvironments(TEST_ENV).map((c) => [c.name, c.webOrigins])),
+    ).toEqual({
+      dev: ['https://dev.cv.ikiwii.com', 'http://localhost:5173'],
+      stag: ['https://stag.cv.ikiwii.com'],
+      prod: ['https://cv.ikiwii.com'],
+    });
+  });
 });

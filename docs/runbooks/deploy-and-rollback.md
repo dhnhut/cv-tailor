@@ -23,7 +23,7 @@ The CDK app has three stages for each environment, plus a DNS stage for `dev` an
 
 | Stage            | Stacks (CloudFormation name)                                                                                                                                                                      | Deployed by                               | When                                                 |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- | ---------------------------------------------------- |
-| `<env>`          | The workload: `<env>-Web`, the web app on S3 and CloudFront (S2-04)                                                                                                                               | CI (`dev` only, on every merge to `main`) | Every merge                                          |
+| `<env>`          | The workload: `<env>-Web`, the web app on S3 and CloudFront (S2-04). `<env>-Auth`, the user pool and the web app's client. `<env>-AuthDomain`, the sign-in pages at `auth.<host>` (S2-05)         | CI (`dev` only, on every merge to `main`) | Every merge                                          |
 | `<env>-access`   | `<env>-access-GithubOidc`: the OIDC provider and `GithubDeployRole`                                                                                                                               | Laptop only                               | Only when the CI trust changes                       |
 | `<env>-baseline` | `<env>-baseline-Budget`: the monthly budget                                                                                                                                                       | Laptop only                               | Only when the budget changes                         |
 | `<env>-dns`      | `<env>-dns-Zone`: the hosted zone and its delegation records. `<env>-dns-Certificate` (`dev` only today): the certificate for `<host>` and `*.<host>` ([ADR-0008](../adr/0008-domain-and-dns.md)) | Laptop only                               | Only when a zone, delegation, or certificate changes |
@@ -33,7 +33,8 @@ Rules:
 - **Never deploy with `'**'`.** Always name one stage, for example `'dev/*'`. CI must never be able to change the role it signs in with, the budget that watches it, or DNS (ADR-0004 §4, ADR-0008).
 - `stag` and `prod` have no workload yet. `prod` has its `-dns` stage; `stag` gets one with the release path (slice R).
 - The workload reads the zone ID and certificate ARN from SSM, so an environment's `-dns` stage, with its certificate, must be deployed before its first workload deploy.
-- `CDKToolkit`, `<env>-access-GithubOidc`, `<env>-baseline-Budget`, `<env>-dns-Zone`, and `<env>-dns-Certificate` have termination protection. Deleting one needs `aws cloudformation update-termination-protection --no-enable-termination-protection` first, and should almost never happen. A deleted zone stack leaves its hosted zone in place (retained).
+- `CDKToolkit`, `<env>-access-GithubOidc`, `<env>-baseline-Budget`, `<env>-dns-Zone`, `<env>-dns-Certificate`, and `<env>-Auth` have termination protection. Deleting one needs `aws cloudformation update-termination-protection --no-enable-termination-protection` first, and should almost never happen. A deleted zone stack leaves its hosted zone in place (retained).
+- **Never replace the user pool.** If `cdk diff` shows the `AWS::Cognito::UserPool` as replaced, don't merge. CloudFormation would create a new, empty pool, and every user would get a new `sub`. Deletion protection and the retain policy keep the old pool, but nothing would point at it any more.
 
 ## 1. Normal deploy (CI)
 
@@ -232,13 +233,13 @@ Then still open the revert PR above. The next merge to `main` redeploys whatever
 
 ### Rollback restores infrastructure, not data
 
-A rollback puts resources back to their earlier definition. It doesn't bring back deleted data. Today `dev` has no data stores (the web bucket holds only build output, which every deploy uploads again), so this is safe. When DynamoDB tables and S3 buckets that hold data are added, they need a retain removal policy and point-in-time recovery or versioning, and this runbook needs a data restore section.
+A rollback puts resources back to their earlier definition. It doesn't bring back deleted data. The web bucket holds only build output, which every deploy uploads again. The user pool (`<env>-Auth`) holds users, and a lost pool can't be restored, because Cognito can't export passwords. So it has deletion protection, a retain policy, termination protection, and a fixed logical ID, and a revert must never replace it (see the rules above). When DynamoDB tables and S3 buckets that hold data are added, they need a retain removal policy and point-in-time recovery or versioning, and this runbook needs a data restore section.
 
 ## Verify
 
 - `pnpm --filter infra exec cdk diff 'dev/*' --profile cvt-dev` prints `There were no differences` on `main`.
 - The latest `CI` run on `main` is green, including `deploy-dev / deploy`: `gh run list --workflow ci.yml --branch main --limit 1`.
-- `describe-stacks` shows `dev-Web` as complete, and `https://dev.cv.ikiwii.com/` returns `200`, as in [step 1](#1-normal-deploy-ci).
+- `describe-stacks` shows `dev-Web`, `dev-Auth`, and `dev-AuthDomain` as complete, and `https://dev.cv.ikiwii.com/` returns `200`, as in [step 1](#1-normal-deploy-ci).
 - `pnpm --filter infra exec cdk diff 'prod-dns/*' --profile cvt-prod` and `pnpm --filter infra exec cdk diff 'dev-dns/*' --profile cvt-dev` print `There were no differences` on `main`.
 
 ## If it fails

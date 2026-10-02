@@ -2,6 +2,8 @@ import { fileURLToPath } from 'node:url';
 import { Stage, type StageProps } from 'aws-cdk-lib';
 import type { Construct } from 'constructs';
 import type { EnvironmentConfig } from '../config/environments.ts';
+import { AuthDomainStack } from './auth-domain-stack.ts';
+import { AuthStack } from './auth-stack.ts';
 import { WebStack } from './web-stack.ts';
 
 // The web app's build output. It must exist before synth: `pnpm run check` builds it first
@@ -24,10 +26,20 @@ export class CvTailorStage extends Stage {
       env: { account: config.account, region: config.region },
     });
 
-    new WebStack(this, 'Web', {
+    const web = new WebStack(this, 'Web', {
       host: config.host,
       config: { environment: config.name },
       siteDirectory: WEB_DIST,
     });
+
+    const auth = new AuthStack(this, 'Auth', {
+      userPoolName: `cv-tailor-${config.name}-users`,
+      webOrigins: config.webOrigins,
+    });
+
+    // CDK can't see a dependency through SSM, so both are declared (ADR-0008, S2-05).
+    const authDomain = new AuthDomainStack(this, 'AuthDomain', { host: config.host });
+    authDomain.addStackDependency(auth, 'reads the pool and client IDs that the auth stack writes');
+    authDomain.addStackDependency(web, `Cognito needs ${config.host} to resolve first`);
   }
 }
