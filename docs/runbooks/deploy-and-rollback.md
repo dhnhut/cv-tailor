@@ -22,12 +22,12 @@ How CV Tailor's infrastructure gets to AWS, how to preview and recover a deploy,
 
 The CDK app has three stages for each environment, plus a DNS stage for `dev` and `prod`. Each stage is deployed separately.
 
-| Stage            | Stacks (CloudFormation name)                                                                                                                                                                      | Deployed by                               | When                                                 |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- | ---------------------------------------------------- |
-| `<env>`          | The workload: `<env>-Web`, the web app on S3 and CloudFront (S2-04). `<env>-Auth`, the user pool and the web app's client. `<env>-AuthDomain`, the sign-in pages at `auth.<host>` (S2-05)         | CI (`dev` only, on every merge to `main`) | Every merge                                          |
-| `<env>-access`   | `<env>-access-GithubOidc`: the OIDC provider and `GithubDeployRole`                                                                                                                               | Laptop only                               | Only when the CI trust changes                       |
-| `<env>-baseline` | `<env>-baseline-Budget`: the monthly budget                                                                                                                                                       | Laptop only                               | Only when the budget changes                         |
-| `<env>-dns`      | `<env>-dns-Zone`: the hosted zone and its delegation records. `<env>-dns-Certificate` (`dev` only today): the certificate for `<host>` and `*.<host>` ([ADR-0008](../adr/0008-domain-and-dns.md)) | Laptop only                               | Only when a zone, delegation, or certificate changes |
+| Stage            | Stacks (CloudFormation name)                                                                                                                                                                                                                           | Deployed by                               | When                                                 |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------- | ---------------------------------------------------- |
+| `<env>`          | The workload: `<env>-Web`, the web app on S3 and CloudFront (S2-04). `<env>-Auth`, the user pool and the web app's client. `<env>-AuthDomain`, the sign-in pages at `auth.<host>` (S2-05). `<env>-Data`, the data table `cv-tailor-<env>-data` (S2-08) | CI (`dev` only, on every merge to `main`) | Every merge                                          |
+| `<env>-access`   | `<env>-access-GithubOidc`: the OIDC provider and `GithubDeployRole`                                                                                                                                                                                    | Laptop only                               | Only when the CI trust changes                       |
+| `<env>-baseline` | `<env>-baseline-Budget`: the monthly budget                                                                                                                                                                                                            | Laptop only                               | Only when the budget changes                         |
+| `<env>-dns`      | `<env>-dns-Zone`: the hosted zone and its delegation records. `<env>-dns-Certificate` (`dev` only today): the certificate for `<host>` and `*.<host>` ([ADR-0008](../adr/0008-domain-and-dns.md))                                                      | Laptop only                               | Only when a zone, delegation, or certificate changes |
 
 Rules:
 
@@ -35,8 +35,9 @@ Rules:
 - `stag` and `prod` have no workload yet. `prod` has its `-dns` stage; `stag` gets one with the release path (slice R).
 - The workload reads the zone ID and certificate ARN from SSM, so an environment's `-dns` stage, with its certificate, must be deployed before its first workload deploy.
 - An environment with a Google client ID in `infra/config/environments.ts` needs its Google client secret in Secrets Manager before the deploy that adds Google sign-in. CloudFormation reads it during that deploy ([Google sign-in runbook](google-sign-in.md#13-store-the-secret)).
-- `CDKToolkit`, `<env>-access-GithubOidc`, `<env>-baseline-Budget`, `<env>-dns-Zone`, `<env>-dns-Certificate`, and `<env>-Auth` have termination protection. Deleting one needs `aws cloudformation update-termination-protection --no-enable-termination-protection` first, and should almost never happen. A deleted zone stack leaves its hosted zone in place (retained).
+- `CDKToolkit`, `<env>-access-GithubOidc`, `<env>-baseline-Budget`, `<env>-dns-Zone`, `<env>-dns-Certificate`, `<env>-Auth`, and `<env>-Data` have termination protection. Deleting one needs `aws cloudformation update-termination-protection --no-enable-termination-protection` first, and should almost never happen. A deleted zone stack leaves its hosted zone in place (retained).
 - **Never replace the user pool.** If `cdk diff` shows the `AWS::Cognito::UserPool` as replaced, don't merge. CloudFormation would create a new, empty pool, and every user would get a new `sub`. Deletion protection and the retain policy keep the old pool, but nothing would point at it any more.
+- **Never replace the data table.** If `cdk diff` shows the `AWS::DynamoDB::GlobalTable` in `<env>-Data` as replaced, or its type changing to `AWS::DynamoDB::Table`, don't merge. The table's fixed name makes a replacement fail, but a type change can delete the table ([ADR-0006](../adr/0006-data-store.md)).
 
 ## 1. Normal deploy (CI)
 
@@ -235,13 +236,65 @@ Then still open the revert PR above. The next merge to `main` redeploys whatever
 
 ### Rollback restores infrastructure, not data
 
-A rollback puts resources back to their earlier definition. It doesn't bring back deleted data. The web bucket holds only build output, which every deploy uploads again. The user pool (`<env>-Auth`) holds users, and a lost pool can't be restored, because Cognito can't export passwords. So it has deletion protection, a retain policy, termination protection, and a fixed logical ID, and a revert must never replace it (see the rules above). When DynamoDB tables and S3 buckets that hold data are added, they need a retain removal policy and point-in-time recovery or versioning, and this runbook needs a data restore section.
+A rollback puts resources back to their earlier definition. It doesn't bring back deleted data. The web bucket holds only build output, which every deploy uploads again. The user pool (`<env>-Auth`) holds users, and a lost pool can't be restored, because Cognito can't export passwords. The data table (`<env>-Data`) holds every user's records. Both have deletion protection, a retain policy, termination protection, and a fixed logical ID, and a revert must never replace either (see the rules above). The table also has point-in-time recovery, so its data can be restored, as described below. When S3 buckets that hold user data are added, they need a retain removal policy and versioning, and a restore section of their own.
+
+### Restore data in the table
+
+Use this when items were deleted or overwritten by mistake, for example by a bug or a wrong command. Point-in-time recovery (PITR) keeps 35 days, and the latest restorable time is about five minutes ago. A restore always creates a **new** table, and the live table stays in use while it runs. So the steps restore into a temporary table, copy back only what was lost, and then delete the temporary table. The live table keeps its name, so CDK and the Lambdas need no change.
+
+1. Find the restorable window:
+
+   ```bash
+   ENV=dev
+   aws dynamodb describe-continuous-backups --table-name "cv-tailor-$ENV-data" --profile "cvt-$ENV" \
+     --query 'ContinuousBackupsDescription.PointInTimeRecoveryDescription'
+   ```
+
+   Expected: `PointInTimeRecoveryStatus` is `ENABLED`, with `EarliestRestorableDateTime` and `LatestRestorableDateTime`.
+
+2. Restore to a moment just before the damage, into a temporary table:
+
+   ```bash
+   AT=2026-10-03T09:00:00Z   # just before the damage, in UTC, inside the window from step 1
+   RESTORED="cv-tailor-$ENV-data-restore-$(date -u +%Y%m%d%H%M)"
+   aws dynamodb restore-table-to-point-in-time --profile "cvt-$ENV" \
+     --source-table-name "cv-tailor-$ENV-data" --target-table-name "$RESTORED" \
+     --restore-date-time "$AT" --billing-mode-override PAY_PER_REQUEST
+   aws dynamodb wait table-exists --table-name "$RESTORED" --profile "cvt-$ENV"
+   ```
+
+   How long a restore takes depends on the table's size, and AWS gives no fixed time. The temporary table doesn't get the live table's TTL, PITR, tags, or alarms. That's fine, because it is deleted at the end.
+
+3. Copy back one user's items. Check them first: `put-item` replaces the live item, so a change made after the restore time would be lost. For quota counters, copying back an old counter gives back quota that was already spent.
+
+   ```bash
+   SUB=<the user's sub>
+   aws dynamodb query --table-name "$RESTORED" --profile "cvt-$ENV" --output json \
+     --key-condition-expression 'PK = :pk' \
+     --expression-attribute-values "{\":pk\":{\"S\":\"USER#$SUB\"}}" \
+     | jq -c '.Items[]' > "restore-$SUB.jsonl"
+   # Read restore-$SUB.jsonl, and remove any line that shouldn't be copied back. Then:
+   while read -r item; do
+     aws dynamodb put-item --table-name "cv-tailor-$ENV-data" --profile "cvt-$ENV" --item "$item"
+   done < "restore-$SUB.jsonl"
+   ```
+
+   The file holds user data, so delete it when you're done.
+
+4. Delete the temporary table and the file:
+
+   ```bash
+   aws dynamodb delete-table --table-name "$RESTORED" --profile "cvt-$ENV"
+   rm "restore-$SUB.jsonl"
+   ```
+
+If the whole table was deleted (deletion protection makes this unlikely), DynamoDB keeps a system backup, `cv-tailor-<env>-data$DeletedTableBackup`, for 35 days. Restoring it under the original name gives back the data, but CloudFormation still thinks it manages the deleted table. Bringing the restored table back into `<env>-Data` needs a resource import. Stop and plan that step before changing anything else.
 
 ## Verify
 
 - `pnpm --filter infra exec cdk diff 'dev/*' --profile cvt-dev` prints `There were no differences` on `main`.
 - The latest `CI` run on `main` is green, including `deploy-dev / deploy`: `gh run list --workflow ci.yml --branch main --limit 1`.
-- `describe-stacks` shows `dev-Web`, `dev-Auth`, and `dev-AuthDomain` as complete, and `https://dev.cv.ikiwii.com/` returns `200`, as in [step 1](#1-normal-deploy-ci).
+- `describe-stacks` shows `dev-Web`, `dev-Auth`, `dev-AuthDomain`, and `dev-Data` as complete, and `https://dev.cv.ikiwii.com/` returns `200`, as in [step 1](#1-normal-deploy-ci).
 - `pnpm --filter infra exec cdk diff 'prod-dns/*' --profile cvt-prod` and `pnpm --filter infra exec cdk diff 'dev-dns/*' --profile cvt-dev` print `There were no differences` on `main`.
 
 ## If it fails
