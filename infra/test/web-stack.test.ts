@@ -13,7 +13,7 @@ const SITE = fileURLToPath(new URL('./fixtures/site', import.meta.url));
 describe('Web stack', () => {
   const stack = new WebStack(testApp(), 'Web', {
     host: 'dev.cv.ikiwii.com',
-    config: { environment: 'dev' },
+    config: { environment: 'dev', apiUrl: 'https://api.dev.cv.ikiwii.com' },
     siteDirectory: SITE,
   });
   const template = Template.fromStack(stack);
@@ -106,7 +106,7 @@ describe('Web stack', () => {
           },
           ContentSecurityPolicy: {
             ContentSecurityPolicy:
-              "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'",
+              "default-src 'self'; connect-src 'self' https://api.dev.cv.ikiwii.com; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'",
             Override: true,
           },
           ContentTypeOptions: { Override: true },

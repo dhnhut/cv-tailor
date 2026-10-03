@@ -2,6 +2,7 @@ import { Stage } from 'aws-cdk-lib';
 import { describe, expect, test } from 'vitest';
 import { REGION, loadEnvironments, type EnvironmentName } from '../config/environments.ts';
 import { createApp } from '../lib/app.ts';
+import { webConfigFor } from '../lib/cv-tailor-stage.ts';
 import { TEST_APP_PROPS, TEST_ENV } from './test-app.ts';
 
 // Every stage (workload, access, baseline, and DNS) synthesises and pins us-east-1
@@ -24,6 +25,7 @@ const EXPECTED: Record<EnvironmentName, { stages: string[]; stacks: string[] }> 
       'dev-Auth',
       'dev-Data',
       'dev-Web',
+      'dev-Api',
       'dev-AuthDomain',
       'dev-access-GithubOidc',
       'dev-baseline-Budget',
@@ -37,6 +39,7 @@ const EXPECTED: Record<EnvironmentName, { stages: string[]; stacks: string[] }> 
       'stag-Auth',
       'stag-Data',
       'stag-Web',
+      'stag-Api',
       'stag-AuthDomain',
       'stag-access-GithubOidc',
       'stag-baseline-Budget',
@@ -48,6 +51,7 @@ const EXPECTED: Record<EnvironmentName, { stages: string[]; stacks: string[] }> 
       'prod-Auth',
       'prod-Data',
       'prod-Web',
+      'prod-Api',
       'prod-AuthDomain',
       'prod-access-GithubOidc',
       'prod-baseline-Budget',
@@ -173,4 +177,35 @@ test.each(CONFIGS)('the $name environment has exactly one data table (ADR-0006)'
       ],
     },
   ]);
+});
+
+// The API reads the pool ID from SSM and finds the table by name, which CDK can't see (S2-09).
+test.each(CONFIGS)('the $name API deploys after its auth and data stacks', (config) => {
+  const { stacks } = synthStage(config.name);
+  const stack = (name: string) => stacks.find((s) => s.stackName === `${config.name}-${name}`);
+
+  expect(stack('Api')?.dependencies.map((d) => d.id)).toEqual(
+    expect.arrayContaining([stack('Auth')?.id, stack('Data')?.id]),
+  );
+});
+
+// S2-09: CORS allows the deployed web app only. localhost signs in to dev (ADR-0009 §5), but
+// can't call the API directly; S2-10 gives the dev server a proxy instead.
+test.each(CONFIGS)('the $name API allows only its own web origin', (config) => {
+  const api = synthStage(config.name).stacks.find((s) => s.stackName === `${config.name}-Api`);
+  const template = JSON.stringify(api?.template);
+
+  expect(template).toContain(`'https://${config.host}'`);
+  expect(template).not.toContain('localhost');
+});
+
+// Written out literally: each environment's web app calls its own API (ADR-0008 names).
+const API_URL: Record<EnvironmentName, string> = {
+  dev: 'https://api.dev.cv.ikiwii.com',
+  stag: 'https://api.stag.cv.ikiwii.com',
+  prod: 'https://api.cv.ikiwii.com',
+};
+
+test.each(CONFIGS)('the $name web app is told its own API URL', (config) => {
+  expect(webConfigFor(config)).toEqual({ environment: config.name, apiUrl: API_URL[config.name] });
 });

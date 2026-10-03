@@ -40,21 +40,24 @@ export const SPA_ROUTING_CODE = `function handler(event) {
   return request;
 }`;
 
-// Everything comes from this origin only. base-uri, frame-ancestors, and form-action don't fall
-// back to default-src, so they're set too. S2-09, S2-10, and Turnstile add their origins here.
-export const CONTENT_SECURITY_POLICY = [
-  "default-src 'self'",
-  "base-uri 'self'",
-  "object-src 'none'",
-  "frame-ancestors 'none'",
-  "form-action 'self'",
-].join('; ');
-
 export interface WebStackProps extends StackProps {
   readonly host: string;
   readonly config: WebConfig; // written to /config.json
   readonly siteDirectory: string; // the web app's build output
 }
+
+// Everything comes from this origin only, except API calls, which go to api.<host> (S2-09).
+// base-uri, frame-ancestors, and form-action don't fall back to default-src, so they're set
+// too. S2-10 adds the sign-in origin to connect-src, and Turnstile adds its own.
+export const contentSecurityPolicy = (apiOrigin: string): string =>
+  [
+    "default-src 'self'",
+    `connect-src 'self' ${apiOrigin}`, // 'self' keeps /config.json loading
+    "base-uri 'self'",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+    "form-action 'self'",
+  ].join('; ');
 
 // The web app at https://<host> (S2-04): a private S3 bucket that only this CloudFront
 // distribution can read, through origin access control.
@@ -86,7 +89,10 @@ export class WebStack extends Stack {
           includeSubdomains: true,
           override: true,
         },
-        contentSecurityPolicy: { contentSecurityPolicy: CONTENT_SECURITY_POLICY, override: true },
+        contentSecurityPolicy: {
+          contentSecurityPolicy: contentSecurityPolicy(new URL(config.apiUrl).origin),
+          override: true,
+        },
         contentTypeOptions: { override: true },
         frameOptions: { frameOption: HeadersFrameOption.DENY, override: true },
         referrerPolicy: {

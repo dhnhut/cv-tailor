@@ -7,10 +7,11 @@
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run --coverage",
-    "build": "esbuild src/triggers/pre-sign-up/handler.ts --bundle --platform=node --target=node24 --format=cjs --outfile=dist/pre-sign-up/index.js"
+    "build": "esbuild pre-sign-up/index=src/triggers/pre-sign-up/handler.ts me/index=src/handlers/me/handler.ts --bundle --platform=node --target=node24 --format=cjs --outdir=dist"
   },
   "dependencies": {
     "@aws-sdk/client-cognito-identity-provider": "^3.1145.0",
+    "@aws-sdk/client-dynamodb": "^3.1145.0",
     "@cv-tailor/contracts": "workspace:*"
   },
   "devDependencies": {

@@ -128,7 +128,15 @@ aws cognito-idp list-users --user-pool-id "$POOL" --profile "cvt-$ENV" \
 
 Expected: no rows.
 
-To delete one, first check that no data is stored under its `sub`. Until `GET /me` writes profile items (S2-09), none is.
+To delete one, first check that no data is stored under its `sub` (the `sub` attribute in `list-users`). Since S2-09, a user's first `GET /me` writes a profile item, so check their partition in the data table:
+
+```bash
+aws dynamodb query --table-name "cv-tailor-$ENV-data" --profile "cvt-$ENV" \
+  --key-condition-expression 'PK = :pk' \
+  --expression-attribute-values '{":pk":{"S":"USER#<sub>"}}' --select COUNT
+```
+
+Expected: `"Count": 0`. If it isn't, the profile holds data: don't delete it without deciding what happens to that data.
 
 ```bash
 aws cognito-idp admin-delete-user --user-pool-id "$POOL" --profile "cvt-$ENV" \
