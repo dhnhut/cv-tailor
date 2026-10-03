@@ -8,13 +8,15 @@ export const GOOGLE_PROVIDER = 'Google';
 // (ADR-0009 §2). The strict pattern also keeps the address safe inside a ListUsers filter string.
 const GMAIL = /^[a-z0-9.]+@gmail\.com$/;
 
-// Managed login shows a refusal's message above the sign-in form.
+// What a refused person sees. Cognito wraps it as "PreSignUp failed with error <message>." and
+// adds the final full stop itself, so the messages leave it out. For a Google sign-in, the text
+// reaches the web app's callback as error_description (ADR-0009 §2).
 export const MESSAGES = {
   googleNotTrusted:
-    'Google sign-in works only for Gmail addresses. Please sign up with your email address and a password.', // case 6
+    'Google sign-in works only for Gmail addresses. Please sign up with your email address and a password', // case 6
   useYourPassword:
-    'An account with this email address already exists. Please sign in with your password.', // cases 7 and 10
-  failed: 'Sign-in failed. Please try again.', // anything unexpected: fail closed
+    'An account with this email address already exists. Please sign in with your password', // cases 7 and 10
+  failed: 'Sign-in failed. Please try again', // anything unexpected: fail closed
 } as const;
 
 export interface GoogleIdentity {
