@@ -145,7 +145,7 @@ test.each(CONFIGS)('the $name environment has exactly one data table (ADR-0006)'
     .map(synthStage)
     .flatMap((assembly) => assembly.stacks)
     .flatMap((stack) =>
-      Object.values(stack.template.Resources as Record<string, CfnResource>)
+      Object.values((stack.template as { Resources: Record<string, CfnResource> }).Resources)
         .filter((resource) => TABLE_TYPES.includes(resource.Type))
         .map(({ Type, Properties }) => ({
           stack: stack.stackName,
