@@ -23,6 +23,14 @@ const localUser = (overrides: Partial<LocalUser> = {}): LocalUser => ({
   ...overrides,
 });
 
+// Seen live in S2-07: Cognito adds a full stop after the message, so one of our own showed "..".
+test.each(Object.entries(MESSAGES))(
+  'message %s leaves the final full stop to Cognito',
+  (_, text) => {
+    expect(text).not.toMatch(/\.$/);
+  },
+);
+
 describe('readGoogleIdentity', () => {
   test('accepts a verified Gmail address, and reads the Google sub from the username', () => {
     expect(readGoogleIdentity(`google_${GOOGLE_SUB}`, VERIFIED_GMAIL)).toEqual(identity);
