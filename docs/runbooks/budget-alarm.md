@@ -78,11 +78,11 @@ Use `--profile cvt-prod-ro` for `prod`.
 
 ## 4. Respond by level
 
-| Alert                                                                 | Response                                                                                                                                                                                                                            |
-| --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Actual 25% or 50%                                                     | Find the driver (step 3). If it's expected, note it and continue. If not, treat it like 80%.                                                                                                                                        |
-| Actual 80%, or forecast 100%                                          | Find the driver and remove it: stop or delete the resource, or delete the workload stack (`aws cloudformation delete-stack --stack-name <env>-Web --profile cvt-<env>`). CI recreates it on the next merge, so fix the cause first. |
-| Actual 100%, a driver you can't find, or suspected leaked credentials | [5. Emergency stop](#5-emergency-stop).                                                                                                                                                                                             |
+| Alert                                                                 | Response                                                                                                                                                                                                                                                           |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Actual 25% or 50%                                                     | Find the driver (step 3). If it's expected, note it and continue. If not, treat it like 80%.                                                                                                                                                                       |
+| Actual 80%, or forecast 100%                                          | Find the driver and remove it: stop or delete the resource, or delete the workload stack that drives it (`aws cloudformation delete-stack --stack-name <env>-Web --profile cvt-<env>`, or `<env>-Api`). CI recreates it on the next merge, so fix the cause first. |
+| Actual 100%, a driver you can't find, or suspected leaked credentials | [5. Emergency stop](#5-emergency-stop).                                                                                                                                                                                                                            |
 
 ## 5. Emergency stop
 
@@ -118,6 +118,15 @@ It stops app roles, Bedrock calls from the app, CI deploys, and any leaked key a
    ```
 
 3. Clean up as the SSO admin. Delete the resources that cost money. To remove a whole CDK stack, use CloudFormation directly. `cdk destroy` doesn't work while the SCP is attached, because the CDK deploy role is denied.
+
+   First the API (S2-09). It holds no data and has no custom resources, so the CloudFormation execution role should be able to delete it on its own (not yet tested in a drill). It goes offline, and `api.<host>` stops resolving. The data table and the user pool are in other stacks and stay.
+
+   ```bash
+   aws cloudformation delete-stack --stack-name "$ENV-Api" --profile "cvt-$ENV"
+   aws cloudformation wait stack-delete-complete --stack-name "$ENV-Api" --profile "cvt-$ENV"
+   ```
+
+   Then the web app:
 
    ```bash
    aws cloudformation delete-stack --stack-name "$ENV-Web" --profile "cvt-$ENV"

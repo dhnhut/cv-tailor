@@ -73,14 +73,14 @@ Rejected, because it fails driver 2. The managed knowledge base ([ADR-0007](0007
 - Quota days and months are UTC (QUOTA-02): `<date>` is `YYYY-MM-DD` and `<month>` is `YYYY-MM`.
 - Every key is built by one module, `apps/api/src/data/keys.ts`. It refuses a `sub` that isn't a lowercase UUID and an ID that contains anything other than letters, digits, `_`, and `-`, so a wrong value can't make a valid-looking key in the wrong partition.
 
-| Item            | `PK`         | `SK`                  | `Entity`        | Notes                                |
-| --------------- | ------------ | --------------------- | --------------- | ------------------------------------ |
-| Profile         | `USER#<sub>` | `PROFILE`             | `Profile`       |                                      |
-| Quota override  | `USER#<sub>` | `QUOTA_OVERRIDE`      | `QuotaOverride` | Set by an admin (ADMIN-02)           |
-| Daily counter   | `USER#<sub>` | `QUOTA#DAY#<date>`    | `QuotaCounter`  | `expiresAt` after the UTC day ends   |
-| Monthly counter | `USER#<sub>` | `QUOTA#MONTH#<month>` | `QuotaCounter`  | `expiresAt` after the UTC month ends |
-| KB document     | `USER#<sub>` | `DOC#<id>`            | `KbDocument`    | Metadata only; the file is in S3     |
-| Generation job  | `USER#<sub>` | `JOB#<id>`            | `GenerationJob` |                                      |
+| Item            | `PK`         | `SK`                  | `Entity`        | Notes                                             |
+| --------------- | ------------ | --------------------- | --------------- | ------------------------------------------------- |
+| Profile         | `USER#<sub>` | `PROFILE`             | `Profile`       | `createdAt` (UTC), written on the first `GET /me` |
+| Quota override  | `USER#<sub>` | `QUOTA_OVERRIDE`      | `QuotaOverride` | Set by an admin (ADMIN-02)                        |
+| Daily counter   | `USER#<sub>` | `QUOTA#DAY#<date>`    | `QuotaCounter`  | `expiresAt` after the UTC day ends                |
+| Monthly counter | `USER#<sub>` | `QUOTA#MONTH#<month>` | `QuotaCounter`  | `expiresAt` after the UTC month ends              |
+| KB document     | `USER#<sub>` | `DOC#<id>`            | `KbDocument`    | Metadata only; the file is in S3                  |
+| Generation job  | `USER#<sub>` | `JOB#<id>`            | `GenerationJob` |                                                   |
 
 ### Access
 

@@ -21,7 +21,14 @@ const importMain = async () => {
 };
 
 test('loads the settings, then mounts the app into #root', async () => {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ environment: 'dev' })));
+  vi.stubGlobal(
+    'fetch',
+    vi
+      .fn()
+      .mockResolvedValue(
+        Response.json({ environment: 'dev', apiUrl: 'https://api.dev.cv.ikiwii.com' }),
+      ),
+  );
   await importMain();
   expect(screen.getByRole('heading', { level: 1, name: 'CV Tailor' })).toBeInstanceOf(
     HTMLHeadingElement,

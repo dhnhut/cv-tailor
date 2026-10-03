@@ -1,6 +1,8 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { loadConfig } from '../src/config';
 
+const CONFIG = { environment: 'dev', apiUrl: 'https://api.dev.cv.ikiwii.com' };
+
 afterEach(() => {
   vi.unstubAllGlobals();
 });
@@ -12,8 +14,8 @@ const stubFetch = (response: Response) => {
 };
 
 test('reads the settings from /config.json', async () => {
-  const fetchMock = stubFetch(Response.json({ environment: 'dev' }));
-  await expect(loadConfig()).resolves.toEqual({ environment: 'dev' });
+  const fetchMock = stubFetch(Response.json(CONFIG));
+  await expect(loadConfig()).resolves.toEqual(CONFIG);
   expect(fetchMock).toHaveBeenCalledWith('/config.json');
 });
 
@@ -23,6 +25,13 @@ test('fails with the status when the file is missing', async () => {
 });
 
 test('fails when the settings have the wrong shape', async () => {
-  stubFetch(Response.json({ environment: 'test' }));
+  stubFetch(Response.json({ ...CONFIG, environment: 'test' }));
+  await expect(loadConfig()).rejects.toThrow();
+});
+
+// A config.json written before S2-09 has no apiUrl. The app refuses it rather than start without
+// an API.
+test('fails when the API URL is missing', async () => {
+  stubFetch(Response.json({ environment: 'dev' }));
   await expect(loadConfig()).rejects.toThrow();
 });
