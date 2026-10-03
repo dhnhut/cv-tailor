@@ -146,7 +146,7 @@ The pool is case-insensitive, so Cognito writes these usernames in lowercase. Th
      --query 'IdentityProvider.{Type:ProviderType,ClientId:ProviderDetails.client_id,Scopes:ProviderDetails.authorize_scopes,Mapping:AttributeMapping}'
    ```
 
-   Expected: `Google`, the committed client ID, `openid email`, and a mapping with `email` and `email_verified`.
+   Expected: `Google`, the committed client ID, `openid email`, and a mapping with `email` and `email_verified`. Cognito adds `username: sub` to the mapping itself.
 
 2. The web client offers Google:
 
