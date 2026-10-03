@@ -128,7 +128,7 @@ aws cognito-idp list-users --user-pool-id "$POOL" --profile "cvt-$ENV" \
 
 Expected: no rows.
 
-To delete one, first check that no data is stored under its `sub`. Until the data table exists (S2-08), none is.
+To delete one, first check that no data is stored under its `sub`. Until `GET /me` writes profile items (S2-09), none is.
 
 ```bash
 aws cognito-idp admin-delete-user --user-pool-id "$POOL" --profile "cvt-$ENV" \

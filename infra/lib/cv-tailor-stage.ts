@@ -5,6 +5,7 @@ import type { EnvironmentConfig } from '../config/environments.ts';
 import { AuthDomainStack } from './auth-domain-stack.ts';
 import { AuthStack } from './auth-stack.ts';
 import { WebStack } from './web-stack.ts';
+import { DataStack } from './data-stack.ts';
 
 // The web app's build output. It must exist before synth: `pnpm run check` builds it first
 // (infra depends on @cv-tailor/web), and deploy.yml builds it before `cdk deploy`.
@@ -29,6 +30,8 @@ export class CvTailorStage extends Stage {
       ...stageProps,
       env: { account: config.account, region: config.region },
     });
+
+    new DataStack(this, 'Data', { tableName: `cv-tailor-${config.name}-data` });
 
     const web = new WebStack(this, 'Web', {
       host: config.host,

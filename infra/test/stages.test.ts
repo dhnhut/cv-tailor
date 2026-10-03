@@ -22,6 +22,7 @@ const EXPECTED: Record<EnvironmentName, { stages: string[]; stacks: string[] }> 
     stages: ['dev', 'dev-access', 'dev-baseline', 'dev-dns'],
     stacks: [
       'dev-Auth',
+      'dev-Data',
       'dev-Web',
       'dev-AuthDomain',
       'dev-access-GithubOidc',
@@ -34,6 +35,7 @@ const EXPECTED: Record<EnvironmentName, { stages: string[]; stacks: string[] }> 
     stages: ['stag', 'stag-access', 'stag-baseline'],
     stacks: [
       'stag-Auth',
+      'stag-Data',
       'stag-Web',
       'stag-AuthDomain',
       'stag-access-GithubOidc',
@@ -44,6 +46,7 @@ const EXPECTED: Record<EnvironmentName, { stages: string[]; stacks: string[] }> 
     stages: ['prod', 'prod-access', 'prod-baseline', 'prod-dns'],
     stacks: [
       'prod-Auth',
+      'prod-Data',
       'prod-Web',
       'prod-AuthDomain',
       'prod-access-GithubOidc',
@@ -125,4 +128,49 @@ test.each(CONFIGS)('only the dev user pool offers Google sign-in ($name)', (conf
   expect(JSON.stringify(auth?.template).includes('AWS::Cognito::UserPoolIdentityProvider')).toBe(
     config.name === 'dev',
   );
+});
+
+// ADR-0006 verification step 1: exactly one DynamoDB table in each environment, across all of its
+// stages, on demand, with TTL, and with PITR and deletion protection on its one us-east-1 replica.
+// Counting across every stage catches a second table added by mistake in any stack.
+const TABLE_TYPES = ['AWS::DynamoDB::Table', 'AWS::DynamoDB::GlobalTable'];
+
+interface CfnResource {
+  readonly Type: string;
+  readonly Properties: Record<string, unknown>;
+}
+
+test.each(CONFIGS)('the $name environment has exactly one data table (ADR-0006)', (config) => {
+  const tables = EXPECTED[config.name].stages
+    .map(synthStage)
+    .flatMap((assembly) => assembly.stacks)
+    .flatMap((stack) =>
+      Object.values(stack.template.Resources as Record<string, CfnResource>)
+        .filter((resource) => TABLE_TYPES.includes(resource.Type))
+        .map(({ Type, Properties }) => ({
+          stack: stack.stackName,
+          type: Type,
+          name: Properties.TableName,
+          billing: Properties.BillingMode,
+          ttl: Properties.TimeToLiveSpecification,
+          replicas: Properties.Replicas,
+        })),
+    );
+
+  expect(tables).toEqual([
+    {
+      stack: `${config.name}-Data`,
+      type: 'AWS::DynamoDB::GlobalTable',
+      name: `cv-tailor-${config.name}-data`,
+      billing: 'PAY_PER_REQUEST',
+      ttl: { AttributeName: 'expiresAt', Enabled: true },
+      replicas: [
+        {
+          Region: 'us-east-1',
+          PointInTimeRecoverySpecification: { PointInTimeRecoveryEnabled: true },
+          DeletionProtectionEnabled: true,
+        },
+      ],
+    },
+  ]);
 });
