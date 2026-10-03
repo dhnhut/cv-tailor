@@ -11,6 +11,7 @@
     "build": "CVT_PLACEHOLDER_ACCOUNTS=1 cdk synth --quiet '**'"
   },
   "devDependencies": {
+    "@cv-tailor/api": "workspace:*",
     "@cv-tailor/config": "workspace:*",
     "@cv-tailor/contracts": "workspace:*",
     "@cv-tailor/web": "workspace:*",

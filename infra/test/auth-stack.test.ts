@@ -1,7 +1,10 @@
+import { fileURLToPath } from 'node:url';
 import { Match, Template } from 'aws-cdk-lib/assertions';
 import { describe, expect, test } from 'vitest';
 import { AuthStack } from '../lib/auth-stack.ts';
 import { testApp } from './test-app.ts';
+
+const PRE_SIGN_UP = fileURLToPath(new URL('./fixtures/pre-sign-up', import.meta.url));
 
 // User pool and web app client (S2-05, ADR-0009 §3–§7, verification steps 1–2). Expected values
 // are written out literally, so changing a constant in the code also fails here.
@@ -10,6 +13,7 @@ describe('Auth stack', () => {
   const stack = new AuthStack(testApp(), 'Auth', {
     userPoolName: 'cv-tailor-dev-users',
     webOrigins: ['https://dev.cv.ikiwii.com', 'http://localhost:5173'],
+    preSignUpDirectory: PRE_SIGN_UP,
   });
   const template = Template.fromStack(stack);
   const [clientId] = Object.keys(template.findResources('AWS::Cognito::UserPoolClient'));
@@ -63,7 +67,14 @@ describe('Auth stack', () => {
         },
       },
     });
-    template.resourceCountIs('AWS::IAM::Role', 0); // CDK creates an SMS role only when SMS is used
+    // CDK creates an SMS role only when SMS is used. The only role is the pre sign-up trigger's.
+    template.hasResourceProperties('AWS::Cognito::UserPool', { SmsConfiguration: Match.absent() });
+    expect(Object.keys(template.findResources('AWS::IAM::Role'))).toHaveLength(1);
+    template.hasResourceProperties('AWS::IAM::Role', {
+      AssumeRolePolicyDocument: Match.objectLike({
+        Statement: [Match.objectLike({ Principal: { Service: 'lambda.amazonaws.com' } })],
+      }),
+    });
   });
 
   test('gives the web app a public client: code flow only, no secret, no attribute-changing scope', () => {
@@ -148,6 +159,80 @@ describe('Auth stack', () => {
   });
 });
 
+// The account-linking pre sign-up trigger (S2-07, ADR-0009 §2).
+describe('Auth stack pre sign-up trigger', () => {
+  const template = Template.fromStack(
+    new AuthStack(testApp(), 'Auth', {
+      userPoolName: 'cv-tailor-dev-users',
+      webOrigins: ['https://dev.cv.ikiwii.com'],
+      preSignUpDirectory: PRE_SIGN_UP,
+    }),
+  );
+  const [functionId] = Object.keys(template.findResources('AWS::Lambda::Function'));
+  const poolArn = { 'Fn::GetAtt': ['UserPool', 'Arn'] };
+
+  test("runs on Node.js 24 within Cognito's 5-second limit, with no reserved concurrency", () => {
+    template.resourceCountIs('AWS::Lambda::Function', 1);
+    template.hasResourceProperties('AWS::Lambda::Function', {
+      Runtime: 'nodejs24.x',
+      Architectures: ['arm64'],
+      Handler: 'index.handler',
+      Timeout: 5,
+      MemorySize: 512,
+      // AdminCreateUser (case 4) invokes the function again while it runs.
+      ReservedConcurrentExecutions: Match.absent(),
+    });
+  });
+
+  test("is the user pool's pre sign-up trigger, and only Cognito from this pool may invoke it", () => {
+    template.hasResourceProperties('AWS::Cognito::UserPool', {
+      LambdaConfig: { PreSignUp: { 'Fn::GetAtt': [functionId, 'Arn'] } },
+    });
+    template.resourceCountIs('AWS::Lambda::Permission', 1);
+    template.hasResourceProperties('AWS::Lambda::Permission', {
+      Action: 'lambda:InvokeFunction',
+      FunctionName: { 'Fn::GetAtt': [functionId, 'Arn'] },
+      Principal: 'cognito-idp.amazonaws.com',
+      SourceArn: poolArn,
+    });
+  });
+
+  // The five Cognito actions in apps/api/src/triggers/pre-sign-up/cognito.ts, on this pool only.
+  test('may call only the Cognito actions it uses, on this user pool only', () => {
+    const policies = template.findResources('AWS::IAM::Policy');
+    const cognitoPolicies = Object.values(policies).filter((policy) =>
+      JSON.stringify(policy).includes('cognito-idp:'),
+    );
+    expect(cognitoPolicies).toHaveLength(1);
+    template.hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: Match.objectEquals({
+        Version: '2012-10-17',
+        Statement: [
+          {
+            Effect: 'Allow',
+            // CDK sorts the actions.
+            Action: [
+              'cognito-idp:AdminCreateUser',
+              'cognito-idp:AdminDeleteUser',
+              'cognito-idp:AdminLinkProviderForUser',
+              'cognito-idp:AdminSetUserPassword',
+              'cognito-idp:ListUsers',
+            ],
+            Resource: poolArn,
+          },
+        ],
+      }),
+    });
+  });
+
+  test('keeps its logs for one month', () => {
+    template.hasResourceProperties('AWS::Logs::LogGroup', { RetentionInDays: 30 });
+    template.hasResourceProperties('AWS::Lambda::Function', {
+      LoggingConfig: { LogGroup: { Ref: Match.stringLikeRegexp('PreSignUpLogs') } },
+    });
+  });
+});
+
 // Google sign-in (S2-06). The secret appears only as a Secrets Manager reference, which
 // CloudFormation resolves at deploy time.
 describe('Auth stack with Google sign-in', () => {
@@ -156,6 +241,7 @@ describe('Auth stack with Google sign-in', () => {
       userPoolName: 'cv-tailor-dev-users',
       webOrigins: ['https://dev.cv.ikiwii.com'],
       googleClientId: '123-abc.apps.googleusercontent.com',
+      preSignUpDirectory: PRE_SIGN_UP,
     }),
   );
   const [googleId] = Object.keys(template.findResources('AWS::Cognito::UserPoolIdentityProvider'));

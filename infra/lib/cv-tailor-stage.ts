@@ -10,6 +10,10 @@ import { WebStack } from './web-stack.ts';
 // (infra depends on @cv-tailor/web), and deploy.yml builds it before `cdk deploy`.
 const WEB_DIST = fileURLToPath(new URL('../../apps/web/dist', import.meta.url));
 
+// The pre sign-up trigger's bundle (S2-07). Built the same way: `pnpm run check` builds it first
+// (infra depends on @cv-tailor/api), and deploy.yml builds it before `cdk deploy`.
+const PRE_SIGN_UP_DIST = fileURLToPath(new URL('../../apps/api/dist/pre-sign-up', import.meta.url));
+
 export interface CvTailorStageProps extends StageProps {
   readonly config: EnvironmentConfig;
 }
@@ -36,6 +40,7 @@ export class CvTailorStage extends Stage {
       userPoolName: `cv-tailor-${config.name}-users`,
       webOrigins: config.webOrigins,
       googleClientId: config.googleClientId,
+      preSignUpDirectory: PRE_SIGN_UP_DIST,
     });
 
     // CDK can't see a dependency through SSM, so both are declared (ADR-0008, S2-05).

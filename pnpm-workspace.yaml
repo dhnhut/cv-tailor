@@ -4,6 +4,9 @@ packages:
   - services/*
   - infra
 
+allowBuilds:
+  esbuild: false # its postinstall only checks or optimises the binary; the @esbuild/<platform> package works without it (S2-07)
+
 tasks:
   build:
     dependsOn: ['^build']

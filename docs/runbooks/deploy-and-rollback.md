@@ -15,7 +15,8 @@ How CV Tailor's infrastructure gets to AWS, how to preview and recover a deploy,
 1. Sign in: `aws sso login --sso-session org` ([account access](account-access.md)).
 2. `infra/.env` exists and has the three account IDs and the alert email ([account access, step 2.4](account-access.md#2-new-machine-setup)). The CDK app builds every stage, so it needs all four values even when you work on one environment.
 3. Dependencies are installed: `pnpm install`.
-4. For CI tasks, the GitHub CLI is signed in: `gh auth status`.
+4. The build output exists: `pnpm --filter @cv-tailor/web --filter @cv-tailor/api run build`. The CDK app uploads `apps/web/dist` and `apps/api/dist/pre-sign-up`, so `cdk synth`, `cdk diff`, and `cdk deploy` fail with `CannotFindAsset` without them. Build again after changing either app.
+5. For CI tasks, the GitHub CLI is signed in: `gh auth status`.
 
 ## What deploys where
 

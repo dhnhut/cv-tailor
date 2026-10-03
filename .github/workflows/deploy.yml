@@ -50,6 +50,10 @@ jobs:
       - name: Build the web app (the dev stage uploads apps/web/dist)
         run: pnpm --filter @cv-tailor/web run build
 
+      # Before AWS credentials too: esbuild bundles the pre sign-up trigger (S2-07).
+      - name: Build the API Lambdas (the dev stage uploads apps/api/dist)
+        run: pnpm --filter @cv-tailor/api run build
+
       # After install, so dependency install scripts never see AWS credentials.
       - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
