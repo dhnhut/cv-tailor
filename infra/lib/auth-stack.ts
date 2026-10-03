@@ -11,7 +11,11 @@ import {
   UserPoolClientIdentityProvider,
   UserPoolEmail,
   UserPoolIdentityProviderGoogle,
+  UserPoolOperation,
 } from 'aws-cdk-lib/aws-cognito';
+import { Policy, PolicyStatement } from 'aws-cdk-lib/aws-iam';
+import { Architecture, Code, Function as LambdaFunction, Runtime } from 'aws-cdk-lib/aws-lambda';
+import { LogGroup, RetentionDays } from 'aws-cdk-lib/aws-logs';
 import { StringParameter } from 'aws-cdk-lib/aws-ssm';
 import type { Construct } from 'constructs';
 
@@ -38,10 +42,20 @@ export const SIGN_OUT_PATH = '/';
 // resource types, and the Cognito identity provider isn't one of them.
 export const GOOGLE_CLIENT_SECRET_NAME = 'cv-tailor/google-client-secret';
 
+// The only Cognito actions the pre sign-up trigger uses (apps/api/.../pre-sign-up/cognito.ts).
+export const PRE_SIGN_UP_ACTIONS = [
+  'cognito-idp:ListUsers',
+  'cognito-idp:AdminCreateUser',
+  'cognito-idp:AdminSetUserPassword',
+  'cognito-idp:AdminLinkProviderForUser',
+  'cognito-idp:AdminDeleteUser',
+];
+
 export interface AuthStackProps extends StackProps {
   readonly userPoolName: string;
   readonly webOrigins: readonly string[]; // where the web app runs
   readonly googleClientId?: string; // absent: no Google sign-in in this environment
+  readonly preSignUpDirectory: string; // the pre sign-up trigger's build output (S2-07)
 }
 
 // The user pool and the web app's client for one environment (S2-05, ADR-0009). Data is keyed by
@@ -49,7 +63,7 @@ export interface AuthStackProps extends StackProps {
 // pool has deletion protection, a retain policy, termination protection, and a fixed logical ID.
 export class AuthStack extends Stack {
   constructor(scope: Construct, id: string, props: AuthStackProps) {
-    const { userPoolName, webOrigins, googleClientId, ...stackProps } = props;
+    const { userPoolName, webOrigins, googleClientId, preSignUpDirectory, ...stackProps } = props;
     super(scope, id, { terminationProtection: true, ...stackProps });
 
     const userPool = new UserPool(this, 'UserPool', {
@@ -78,6 +92,31 @@ export class AuthStack extends Stack {
     // CloudFormation tracks a resource by its logical ID. If a refactor changed it, CloudFormation
     // would create a new, empty pool and only retain the old one.
     (userPool.node.defaultChild as CfnUserPool).overrideLogicalId('UserPool');
+
+    // The pre sign-up trigger links a first Google sign-in to the person's local user, so their
+    // sub never changes (S2-07, ADR-0009 §1–§2). Cognito waits 5 seconds for it.
+    const preSignUp = new LambdaFunction(this, 'PreSignUp', {
+      description: 'Links Google sign-ins to local users (S2-07, ADR-0009 §2)',
+      runtime: Runtime.NODEJS_24_X,
+      architecture: Architecture.ARM_64,
+      handler: 'index.handler',
+      code: Code.fromAsset(preSignUpDirectory), // built by apps/api before AWS credentials exist
+      timeout: Duration.seconds(5), // Cognito stops waiting at 5 seconds anyway
+      memorySize: 512, // more memory gives more CPU, so a shorter cold start; the cost is negligible
+      logGroup: new LogGroup(this, 'PreSignUpLogs', { retention: RetentionDays.ONE_MONTH }),
+      // No reserved concurrency: AdminCreateUser (case 4) invokes this function again while it runs.
+    });
+    userPool.addTrigger(UserPoolOperation.PRE_SIGN_UP, preSignUp); // adds the invoke permission too
+
+    // A separate policy, not preSignUp.addToRolePolicy: the pool depends on the function (its
+    // trigger), and the function depends on its role's default policy, so the pool's ARN there
+    // would make a dependency cycle.
+    new Policy(this, 'PreSignUpCognitoAccess', {
+      roles: [preSignUp.role!],
+      statements: [
+        new PolicyStatement({ actions: PRE_SIGN_UP_ACTIONS, resources: [userPool.userPoolArn] }),
+      ],
+    });
 
     // Google sign-in (S2-06). Asks Google only for the email address (SAFE-04), and maps whether
     // Google verified it: mapped emails are unverified otherwise, and the pre sign-up trigger

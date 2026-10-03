@@ -6,9 +6,11 @@
   "scripts": {
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run --coverage"
+    "test": "vitest run --coverage",
+    "build": "esbuild src/triggers/pre-sign-up/handler.ts --bundle --platform=node --target=node24 --format=cjs --outfile=dist/pre-sign-up/index.js"
   },
   "dependencies": {
+    "@aws-sdk/client-cognito-identity-provider": "^3.1145.0",
     "@cv-tailor/contracts": "workspace:*"
   },
   "devDependencies": {
@@ -16,6 +18,7 @@
     "@types/aws-lambda": "^8.10.163",
     "@types/node": "^24.19.0",
     "@vitest/coverage-v8": "5.0.2",
+    "esbuild": "^0.28.2",
     "eslint": "^10.11.0",
     "typescript": "~6.0.3",
     "vitest": "^5.0.2"
