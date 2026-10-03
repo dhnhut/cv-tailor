@@ -33,6 +33,7 @@ Rules:
 - **Never deploy with `'**'`.** Always name one stage, for example `'dev/*'`. CI must never be able to change the role it signs in with, the budget that watches it, or DNS (ADR-0004 §4, ADR-0008).
 - `stag` and `prod` have no workload yet. `prod` has its `-dns` stage; `stag` gets one with the release path (slice R).
 - The workload reads the zone ID and certificate ARN from SSM, so an environment's `-dns` stage, with its certificate, must be deployed before its first workload deploy.
+- An environment with a Google client ID in `infra/config/environments.ts` needs its Google client secret in Secrets Manager before the deploy that adds Google sign-in. CloudFormation reads it during that deploy ([Google sign-in runbook](google-sign-in.md#13-store-the-secret)).
 - `CDKToolkit`, `<env>-access-GithubOidc`, `<env>-baseline-Budget`, `<env>-dns-Zone`, `<env>-dns-Certificate`, and `<env>-Auth` have termination protection. Deleting one needs `aws cloudformation update-termination-protection --no-enable-termination-protection` first, and should almost never happen. A deleted zone stack leaves its hosted zone in place (retained).
 - **Never replace the user pool.** If `cdk diff` shows the `AWS::Cognito::UserPool` as replaced, don't merge. CloudFormation would create a new, empty pool, and every user would get a new `sub`. Deletion protection and the retain policy keep the old pool, but nothing would point at it any more.
 

@@ -142,4 +142,47 @@ describe('Auth stack', () => {
       Value: { Ref: clientId },
     });
   });
+
+  test('has no Google sign-in unless it gets a Google client ID', () => {
+    template.resourceCountIs('AWS::Cognito::UserPoolIdentityProvider', 0);
+  });
+});
+
+// Google sign-in (S2-06). The secret appears only as a Secrets Manager reference, which
+// CloudFormation resolves at deploy time.
+describe('Auth stack with Google sign-in', () => {
+  const template = Template.fromStack(
+    new AuthStack(testApp(), 'Auth', {
+      userPoolName: 'cv-tailor-dev-users',
+      webOrigins: ['https://dev.cv.ikiwii.com'],
+      googleClientId: '123-abc.apps.googleusercontent.com',
+    }),
+  );
+  const [googleId] = Object.keys(template.findResources('AWS::Cognito::UserPoolIdentityProvider'));
+
+  test('asks Google only for the email address, and maps whether Google verified it', () => {
+    template.resourceCountIs('AWS::Cognito::UserPoolIdentityProvider', 1);
+    template.hasResourceProperties(
+      'AWS::Cognito::UserPoolIdentityProvider',
+      Match.objectEquals({
+        UserPoolId: { Ref: 'UserPool' },
+        ProviderName: 'Google',
+        ProviderType: 'Google',
+        ProviderDetails: {
+          client_id: '123-abc.apps.googleusercontent.com',
+          client_secret:
+            '{{resolve:secretsmanager:cv-tailor/google-client-secret:SecretString:::}}',
+          authorize_scopes: 'openid email',
+        },
+        AttributeMapping: { email: 'email', email_verified: 'email_verified' },
+      }),
+    );
+  });
+
+  test('offers Google on the web client, after the provider exists', () => {
+    template.hasResource('AWS::Cognito::UserPoolClient', {
+      Properties: Match.objectLike({ SupportedIdentityProviders: ['COGNITO', 'Google'] }),
+      DependsOn: Match.arrayWith([googleId]),
+    });
+  });
 });

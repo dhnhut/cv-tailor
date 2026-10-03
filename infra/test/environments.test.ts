@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import {
   DNS,
+  GOOGLE_CLIENT_ID,
   HOST,
   PLACEHOLDER_ACCOUNT_ID,
   PLACEHOLDER_ALERT_EMAIL,
@@ -24,6 +25,7 @@ describe('loadEnvironments', () => {
         alertEmail: EMAIL,
         monthlyBudgetUsd: 5,
         dns: DNS.dev,
+        googleClientId: GOOGLE_CLIENT_ID.dev,
       },
       {
         name: 'stag',
@@ -135,5 +137,19 @@ describe('Sign-in origins (S2-05, ADR-0009)', () => {
       stag: ['https://stag.cv.ikiwii.com'],
       prod: ['https://cv.ikiwii.com'],
     });
+  });
+});
+
+describe('Google sign-in (S2-06, ADR-0009)', () => {
+  // Client IDs are copied by hand from the Google console, so a truncated or wrong value fails here.
+  test('only dev has a Google client, and its ID has the Google format', () => {
+    expect(Object.keys(GOOGLE_CLIENT_ID)).toEqual(['dev']);
+    expect(GOOGLE_CLIENT_ID.dev).toMatch(/^\d+-[a-z0-9]+\.apps\.googleusercontent\.com$/);
+  });
+
+  test('leaves the googleClientId key out, not undefined, for an environment without one', () => {
+    expect(loadEnvironments(TEST_ENV).find((c) => c.name === 'stag')).not.toHaveProperty(
+      'googleClientId',
+    );
   });
 });
