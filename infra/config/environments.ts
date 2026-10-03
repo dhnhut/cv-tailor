@@ -55,6 +55,14 @@ export const HOST: Record<EnvironmentName, string> = {
 // web app on a laptop can sign in against dev (ADR-0009 §5).
 export const LOCAL_WEB_ORIGIN = 'http://localhost:5173';
 
+// Google sign-in (S2-06, ADR-0009). Each environment has its own Google OAuth client. Its ID is
+// public (Google shows it in every sign-in URL), so it's committed. Its secret isn't: it's stored
+// by hand in Secrets Manager (google-sign-in runbook). stag and prod get clients with the release
+// path (slice R).
+export const GOOGLE_CLIENT_ID: Partial<Record<EnvironmentName, string>> = {
+  dev: '963342850841-qvv0u3e8bucs75d0amgr7ah16kveic4a.apps.googleusercontent.com',
+};
+
 // A child zone delegated from an environment's zone (ADR-0008). Name servers are public
 // DNS data, so they are committed. They come from the child zone stack's NameServers
 // output after its first deploy (deploy runbook, step 3).
@@ -99,6 +107,7 @@ export interface EnvironmentConfig {
   readonly alertEmail: string;
   readonly dns?: DnsConfig; // absent: the environment has no DNS stage yet
   readonly webOrigins: readonly string[]; // where the web app runs, for sign-in callbacks (S2-05)
+  readonly googleClientId?: string; // absent: no Google sign-in yet (S2-06)
 }
 
 // Check for missing or invalid environment variables.
@@ -140,6 +149,7 @@ export function loadEnvironments(
 
   return ENVIRONMENT_NAMES.map((name) => {
     const dns = DNS[name];
+    const googleClientId = GOOGLE_CLIENT_ID[name];
     return {
       name,
       account: placeholder ? PLACEHOLDER_ACCOUNT_ID : (env[accountIdVar(name)] as string),
@@ -150,6 +160,7 @@ export function loadEnvironments(
       monthlyBudgetUsd: MONTHLY_BUDGET_USD[name],
       alertEmail: placeholder ? PLACEHOLDER_ALERT_EMAIL : (env[ALERT_EMAIL_VAR] as string),
       ...(dns ? { dns } : {}),
+      ...(googleClientId ? { googleClientId } : {}),
     };
   });
 }

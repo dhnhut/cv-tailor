@@ -117,3 +117,12 @@ test.each(CONFIGS)('only the dev app client accepts localhost callbacks ($name)'
 
   expect(JSON.stringify(auth?.template).includes('http://localhost')).toBe(config.name === 'dev');
 });
+
+// S2-06: only dev has a Google client so far (GOOGLE_CLIENT_ID in config/environments.ts).
+test.each(CONFIGS)('only the dev user pool offers Google sign-in ($name)', (config) => {
+  const auth = synthStage(config.name).stacks.find((s) => s.stackName === `${config.name}-Auth`);
+
+  expect(JSON.stringify(auth?.template).includes('AWS::Cognito::UserPoolIdentityProvider')).toBe(
+    config.name === 'dev',
+  );
+});

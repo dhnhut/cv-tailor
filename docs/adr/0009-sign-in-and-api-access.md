@@ -1,12 +1,12 @@
 # ADR-0009: Sign-In and API Access
 
-| Field       | Value                                                                                                                                                                     |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Status      | Accepted                                                                                                                                                                  |
-| Date        | 2026-10-02                                                                                                                                                                |
-| Amended     | 2026-10-02: the app client's sign-in flows, PKCE, and the refresh grace period are recorded, and point 3 is corrected: a user can sign in through the Cognito API (S2-05) |
-| Deciders    | Project owner                                                                                                                                                             |
-| Sprint item | S2-02                                                                                                                                                                     |
+| Field       | Value                                                                                                                                                                                                                                                                                     |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status      | Accepted                                                                                                                                                                                                                                                                                  |
+| Date        | 2026-10-02                                                                                                                                                                                                                                                                                |
+| Amended     | 2026-10-02: the app client's sign-in flows, PKCE, and the refresh grace period are recorded, and point 3 is corrected: a user can sign in through the Cognito API (S2-05); 2026-10-03: Google sign-in settings and where the Google client secret is kept are recorded in point 4 (S2-06) |
+| Deciders    | Project owner                                                                                                                                                                                                                                                                             |
+| Sprint item | S2-02                                                                                                                                                                                                                                                                                     |
 
 ## Context
 
@@ -142,6 +142,13 @@ Users who sign in with Google count toward the 10,000 free MAU. Users from OIDC 
 - **Lockout:** after 5 failed attempts, Cognito locks the user out for 1 second, and the lock doubles with each further failure up to about 15 minutes [17].
 - **No password needed:** Google sign-in avoids passwords entirely.
 - **No breached-password check:** Essentials doesn't check for breached passwords; Plus does [13]. Password reuse prevention is available but not turned on [18].
+
+**Google sign-in (S2-06):**
+
+- **Scopes:** `openid` and `email` only. The name and photo that Google's `profile` scope adds aren't needed (SAFE-04).
+- **Attribute mapping:** `email` and `email_verified`. Cognito stores a mapped email address as unverified unless `email_verified` is mapped [46], and point 2 links only verified addresses. An app client can't be given write access to `email_verified`, so users can't mark their own address as verified [47].
+- **Clients:** one Google OAuth client per environment, each in its own Google Cloud project. The client ID is public, because Google shows it in every sign-in URL, so it's committed in `infra/config/environments.ts`.
+- **Client secret:** a Secrets Manager secret, `cv-tailor/google-client-secret`, created by hand in each environment and never committed. CloudFormation reads it when it creates or changes the identity provider. An SSM SecureString can't be used: CloudFormation resolves those only for a short list of resource properties, and the Cognito identity provider isn't one of them [48]. A Secrets Manager reference works in any property [49]. It costs USD 0.40 per month per environment.
 
 ### 5. Web app sign-in
 
@@ -284,6 +291,9 @@ So the link stays. A sign-up through it carries no token, so the trigger refuses
 - **Unconfirmed sign-ups block their email address.** Nothing removes them automatically yet, except a Google sign-in by the address's owner (case 5).
 - **CORS needs more setup on a REST API** than on an HTTP API.
 - **Two choices are permanent:** the sign-in identifier (email as username) and the required attributes can't be changed after the user pool is created.
+- **The Google client secret can be read through Cognito.** Cognito returns it to anyone allowed to describe the identity provider [50]. The runbook's commands use `--query` to keep it out of terminal output.
+- **A rotated Google client secret doesn't reach Cognito by itself.** CloudFormation reads a secret only when the resource that uses it changes [49], so the [Google sign-in runbook](../runbooks/google-sign-in.md) pushes it to Cognito.
+- **The CloudFormation execution role must be able to read the Google client secret.** This matters when that role is scoped down ([ADR-0004](0004-accounts-and-access.md) §5).
 
 ### Risks and mitigations
 
@@ -328,10 +338,11 @@ So the link stays. A sign-up through it carries no token, so the trigger refuses
 5. **Admin group (S2-09):** after a user is added to `admin`, `GET /me` shows them as an admin once their next tokens are issued.
 6. **Sign-out (S2-10):** after sign-out, the old refresh token can't get new tokens.
 7. **Turnstile (before the first `prod` release):** in an environment that requires Turnstile, a sign-up through managed login is refused, and a sign-up through the web app's form with a valid token succeeds.
+8. **Google sign-in (S2-06):** `aws cognito-idp describe-identity-provider --user-pool-id <id> --provider-name Google --query 'IdentityProvider.{Scopes:ProviderDetails.authorize_scopes,Mapping:AttributeMapping}' --profile cvt-dev` shows the scopes `openid email` and a mapping for `email` and `email_verified`. The `--query` keeps the client secret out of the output. A Google sign-in through managed login gives a user whose `email_verified` is `true`.
 
 ## Sources
 
-Accessed 2026-10-01 to 2026-10-02.
+Accessed 2026-10-01 to 2026-10-03.
 
 1. Linking federated users to an existing user profile: <https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pools-identity-federation-consolidate-users.html>
 2. `AdminLinkProviderForUser`: <https://docs.aws.amazon.com/cognito-user-identity-pools/latest/APIReference/API_AdminLinkProviderForUser.html>
@@ -378,3 +389,8 @@ Accessed 2026-10-01 to 2026-10-02.
 43. Configure CORS for HTTP APIs: <https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-cors.html>
 44. Authentication with Amazon Cognito user pools: <https://docs.aws.amazon.com/cognito/latest/developerguide/authentication.html>
 45. `CreateUserPoolClient`: <https://docs.aws.amazon.com/cognito-user-identity-pools/latest/APIReference/API_CreateUserPoolClient.html>
+46. Mapping IdP attributes to profiles and tokens: <https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pools-specifying-attribute-mapping.html>
+47. Application-specific settings with app clients: <https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-settings-client-apps.html>
+48. CloudFormation, Get a secure string value from Systems Manager Parameter Store: <https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/dynamic-references-ssm-secure-strings.html>
+49. CloudFormation, Get a secret or secret value from Secrets Manager: <https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/dynamic-references-secretsmanager.html>
+50. `UpdateIdentityProvider` (its describe response includes `client_secret`): <https://docs.aws.amazon.com/cognito-user-identity-pools/latest/APIReference/API_UpdateIdentityProvider.html>

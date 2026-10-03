@@ -35,6 +35,7 @@ export class CvTailorStage extends Stage {
     const auth = new AuthStack(this, 'Auth', {
       userPoolName: `cv-tailor-${config.name}-users`,
       webOrigins: config.webOrigins,
+      googleClientId: config.googleClientId,
     });
 
     // CDK can't see a dependency through SSM, so both are declared (ADR-0008, S2-05).

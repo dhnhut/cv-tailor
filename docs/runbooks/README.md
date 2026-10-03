@@ -7,6 +7,7 @@ Step-by-step procedures for operating CV Tailor's AWS accounts and deployments. 
 | [Account access](account-access.md)           | Signing in to AWS, setting up a new machine, giving access to a new account, or SSO stops working.     | ADR-0004 §3        |
 | [Deploy and rollback](deploy-and-rollback.md) | Deploying, previewing a change, setting up a new account, recovering a failed deploy, or rolling back. | ADR-0004 §4–5, §10 |
 | [Users and admins](users-and-admins.md)       | Adding or removing an admin, or looking up a user.                                                     | ADR-0009 §7        |
+| [Google sign-in](google-sign-in.md)           | Setting up Google sign-in, rotating its client secret, or Google sign-in fails.                        | ADR-0009 §4        |
 | [Budget alarm response](budget-alarm.md)      | A budget alert email arrives, or spend looks wrong.                                                    | `AGENTS.md` §8     |
 | [Kill switch](kill-switch.md)                 | Placeholder. The feature doesn't exist yet.                                                            | ADMIN-03           |
 
