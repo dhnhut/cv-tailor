@@ -2,10 +2,11 @@ import { render, screen } from '@testing-library/react';
 import type { WebConfig } from '@cv-tailor/contracts';
 import { expect, test } from 'vitest';
 import { App } from '../src/App';
+import { DEV_CONFIG } from './fixtures';
 
 const config = (environment: WebConfig['environment']): WebConfig => ({
+  ...DEV_CONFIG,
   environment,
-  apiUrl: 'https://api.dev.cv.ikiwii.com',
 });
 
 test('renders the app heading', () => {

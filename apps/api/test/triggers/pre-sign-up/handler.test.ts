@@ -1,8 +1,8 @@
 import type { PreSignUpTriggerEvent } from 'aws-lambda';
 import { afterEach, beforeEach, describe, expect, type MockInstance, test, vi } from 'vitest';
+import { PRE_SIGN_UP_MESSAGES } from '@cv-tailor/contracts/sign-in-messages';
 import type { UserDirectory } from '../../../src/triggers/pre-sign-up/cognito.ts';
 import { createHandler, handler } from '../../../src/triggers/pre-sign-up/handler.ts';
-import { MESSAGES } from '../../../src/triggers/pre-sign-up/rules.ts';
 
 // The pre sign-up trigger end to end, one test per ADR-0009 §2 case (S2-07), against an in-memory
 // user pool. Cases 2 and 9 never reach the trigger, so they're checked live (google-sign-in
@@ -164,7 +164,7 @@ describe('sign-ups that are not Google sign-ins', () => {
     };
     await expect(
       createHandler(pool.directory)(unknown as unknown as PreSignUpTriggerEvent),
-    ).rejects.toThrow(MESSAGES.failed);
+    ).rejects.toThrow(PRE_SIGN_UP_MESSAGES.failed);
     expect(pool.calls).toEqual([]);
   });
 });
@@ -230,7 +230,7 @@ describe('first Google sign-in', () => {
     async (_, attributes) => {
       const pool = fakePool({ 'local-1': user() });
       await expect(createHandler(pool.directory)(googleSignIn(attributes))).rejects.toThrow(
-        MESSAGES.googleNotTrusted,
+        PRE_SIGN_UP_MESSAGES.googleNotTrusted,
       );
       expect(pool.calls).toEqual([]);
     },
@@ -239,7 +239,7 @@ describe('first Google sign-in', () => {
   test('case 7: refuses when the confirmed user has an unverified email, and changes nothing', async () => {
     const pool = fakePool({ 'local-1': user({ emailVerified: false }) });
     await expect(createHandler(pool.directory)(googleSignIn())).rejects.toThrow(
-      MESSAGES.useYourPassword,
+      PRE_SIGN_UP_MESSAGES.useYourPassword,
     );
     expect(pool.calls).toEqual(['findLocalUsers']);
     expect(pool.users.get('local-1')).toEqual(user({ emailVerified: false }));
@@ -266,7 +266,7 @@ describe('first Google sign-in', () => {
       }),
     });
     await expect(createHandler(pool.directory)(googleSignIn())).rejects.toThrow(
-      MESSAGES.useYourPassword,
+      PRE_SIGN_UP_MESSAGES.useYourPassword,
     );
     expect(pool.calls).toEqual(['findLocalUsers']);
   });
@@ -277,7 +277,7 @@ describe('first Google sign-in', () => {
     const pool = fakePool();
     const trigger = createHandler(pool.directory);
     pool.failNext('setRandomPassword', new Error('timed out'));
-    await expect(trigger(googleSignIn())).rejects.toThrow(MESSAGES.failed);
+    await expect(trigger(googleSignIn())).rejects.toThrow(PRE_SIGN_UP_MESSAGES.failed);
     expect(pool.users.get('new-user-1')?.status).toBe('FORCE_CHANGE_PASSWORD');
 
     await trigger(googleSignIn());
@@ -292,13 +292,15 @@ describe('first Google sign-in', () => {
     const pool = fakePool();
     await expect(
       createHandler(pool.directory)(googleSignIn(undefined, 'linkedin_123')),
-    ).rejects.toThrow(MESSAGES.failed);
+    ).rejects.toThrow(PRE_SIGN_UP_MESSAGES.failed);
     expect(pool.calls).toEqual([]);
   });
 
   test('refuses when more than one local user has the address', async () => {
     const pool = fakePool({ 'local-1': user(), 'local-2': user() });
-    await expect(createHandler(pool.directory)(googleSignIn())).rejects.toThrow(MESSAGES.failed);
+    await expect(createHandler(pool.directory)(googleSignIn())).rejects.toThrow(
+      PRE_SIGN_UP_MESSAGES.failed,
+    );
     expect(pool.calls).toEqual(['findLocalUsers']);
   });
 });
@@ -310,7 +312,9 @@ describe('errors and logs', () => {
     error.name = 'TooManyRequestsException';
     pool.failNext('linkGoogle', error);
 
-    await expect(createHandler(pool.directory)(googleSignIn())).rejects.toThrow(MESSAGES.failed);
+    await expect(createHandler(pool.directory)(googleSignIn())).rejects.toThrow(
+      PRE_SIGN_UP_MESSAGES.failed,
+    );
     expect(errorLog).toHaveBeenCalledTimes(1);
     expect(logged()).toContain('"error":"TooManyRequestsException"');
     expect(logged()).not.toContain(EMAIL);
@@ -325,7 +329,9 @@ describe('errors and logs', () => {
       // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
       findLocalUsers: () => Promise.reject('boom'),
     };
-    await expect(createHandler(failing)(googleSignIn())).rejects.toThrow(MESSAGES.failed);
+    await expect(createHandler(failing)(googleSignIn())).rejects.toThrow(
+      PRE_SIGN_UP_MESSAGES.failed,
+    );
     expect(logged()).toContain('"error":"Unknown"');
   });
 
@@ -352,7 +358,7 @@ describe('errors and logs', () => {
       createHandler(pool.directory)(
         googleSignIn({ email: 'bob@company.com', email_verified: 'true' }),
       ),
-    ).rejects.toThrow(MESSAGES.googleNotTrusted);
+    ).rejects.toThrow(PRE_SIGN_UP_MESSAGES.googleNotTrusted);
     expect(logged()).toContain('"action":"refuse"');
     expect(logged()).not.toContain('bob@company.com');
   });

@@ -19,7 +19,9 @@ services/agents/src/cv_tailor_agents/contracts/*.py   ← generated Pydantic v2,
 | `apps/api` (TS)   | The Zod schema directly: `import { HealthResponse } from '@cv-tailor/contracts'` | Compile time (type) and runtime (`.parse`) |
 | `services/agents` | The generated Pydantic model                                                     | Runtime (`model_validate`) and mypy        |
 | `apps/web` (TS)   | `WebConfig`, to check `/config.json` before the app starts                       | Compile time (type) and runtime (`.parse`) |
-| `infra` (TS)      | The `WebConfig` type, for the `config.json` that CDK writes                      | Compile time (type)                        |
+| `infra` (TS)      | `WebConfig`, for the `config.json` that CDK writes (`.omit` checks it at synth)  | Compile time (type) and synth (`.parse`)   |
+
+Shared constants that aren't schemas, such as the pre sign-up trigger's refusal messages (`@cv-tailor/contracts/sign-in-messages`, read by `apps/api`, and by the web app's sign-in callback from S2-10), live in their own file with a subpath export in `package.json`. They have no zod import, so a Lambda that needs only them stays small, and they're never registered.
 
 The reasons for this design, and the tools that were compared, are recorded in [ADR-0003](../../docs/adr/0003-contracts-codegen.md).
 

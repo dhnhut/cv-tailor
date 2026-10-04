@@ -1,7 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { loadConfig } from '../src/config';
-
-const CONFIG = { environment: 'dev', apiUrl: 'https://api.dev.cv.ikiwii.com' };
+import { DEV_CONFIG as CONFIG } from './fixtures';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -33,5 +32,12 @@ test('fails when the settings have the wrong shape', async () => {
 // an API.
 test('fails when the API URL is missing', async () => {
   stubFetch(Response.json({ environment: 'dev' }));
+  await expect(loadConfig()).rejects.toThrow();
+});
+
+// A config.json written before S2-10 has no sign-in settings. The app refuses it rather than
+// start without sign-in.
+test('fails when the sign-in settings are missing', async () => {
+  stubFetch(Response.json({ environment: 'dev', apiUrl: CONFIG.apiUrl }));
   await expect(loadConfig()).rejects.toThrow();
 });

@@ -2,6 +2,7 @@
 // beforeAll hook for that needs Vitest globals, which this project doesn't use.
 import { act, screen } from '@testing-library/react';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { DEV_CONFIG } from './fixtures';
 
 beforeEach(() => {
   vi.resetModules(); // main.tsx runs on import, so each test needs a fresh module
@@ -21,14 +22,7 @@ const importMain = async () => {
 };
 
 test('loads the settings, then mounts the app into #root', async () => {
-  vi.stubGlobal(
-    'fetch',
-    vi
-      .fn()
-      .mockResolvedValue(
-        Response.json({ environment: 'dev', apiUrl: 'https://api.dev.cv.ikiwii.com' }),
-      ),
-  );
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(DEV_CONFIG)));
   await importMain();
   expect(screen.getByRole('heading', { level: 1, name: 'CV Tailor' })).toBeInstanceOf(
     HTMLHeadingElement,

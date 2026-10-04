@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
-import { Match, Template } from 'aws-cdk-lib/assertions';
+import { Capture, Match, Template } from 'aws-cdk-lib/assertions';
 import { describe, expect, test } from 'vitest';
 import { SPA_ROUTING_CODE, WebStack } from '../lib/web-stack.ts';
 import { testApp } from './test-app.ts';
@@ -13,7 +13,11 @@ const SITE = fileURLToPath(new URL('./fixtures/site', import.meta.url));
 describe('Web stack', () => {
   const stack = new WebStack(testApp(), 'Web', {
     host: 'dev.cv.ikiwii.com',
-    config: { environment: 'dev', apiUrl: 'https://api.dev.cv.ikiwii.com' },
+    config: {
+      environment: 'dev',
+      apiUrl: 'https://api.dev.cv.ikiwii.com',
+      authUrl: 'https://auth.dev.cv.ikiwii.com',
+    },
     siteDirectory: SITE,
   });
   const template = Template.fromStack(stack);
@@ -21,6 +25,8 @@ describe('Web stack', () => {
     Object.keys(template.findParameters('*')).find((id) => id.startsWith(prefix));
   const zoneIdParameter = parameterId('SsmParameterValuecvtailordnszoneid');
   const certificateArnParameter = parameterId('SsmParameterValuecvtailordnscertificatearn');
+  const userPoolIdParameter = parameterId('SsmParameterValuecvtailorauthuserpoolid');
+  const webClientIdParameter = parameterId('SsmParameterValuecvtailorauthwebclientid');
 
   test('reads the zone ID and certificate ARN from SSM at deploy time, not from exports', () => {
     template.hasParameter(zoneIdParameter!, {
@@ -31,7 +37,29 @@ describe('Web stack', () => {
       Type: 'AWS::SSM::Parameter::Value<String>',
       Default: '/cv-tailor/dns/certificate-arn',
     });
+    template.hasParameter(userPoolIdParameter!, {
+      Type: 'AWS::SSM::Parameter::Value<String>',
+      Default: '/cv-tailor/auth/user-pool-id',
+    });
+    template.hasParameter(webClientIdParameter!, {
+      Type: 'AWS::SSM::Parameter::Value<String>',
+      Default: '/cv-tailor/auth/web-client-id',
+    });
     expect(JSON.stringify(template.toJSON())).not.toContain('Fn::ImportValue');
+  });
+
+  // S2-10: the IDs exist only after <env>-Auth deploys, so BucketDeployment fills them in at deploy
+  // time. CDK wraps each Ref in a Fn::Join that adds JSON quotes, so the check looks for the Ref
+  // inside the markers rather than pinning that internal shape.
+  test('writes the pool and client IDs from SSM into config.json at deploy time', () => {
+    const markers = new Capture();
+    template.hasResourceProperties('Custom::CDKBucketDeployment', {
+      Prune: true, // the index.html and config.json deployment, not the assets
+      SourceMarkers: markers,
+    });
+    const text = JSON.stringify(markers.asArray());
+    expect(text).toContain(JSON.stringify({ Ref: userPoolIdParameter }));
+    expect(text).toContain(JSON.stringify({ Ref: webClientIdParameter }));
   });
 
   test('keeps the bucket private, encrypted, and reachable only over TLS', () => {
@@ -106,7 +134,7 @@ describe('Web stack', () => {
           },
           ContentSecurityPolicy: {
             ContentSecurityPolicy:
-              "default-src 'self'; connect-src 'self' https://api.dev.cv.ikiwii.com; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'",
+              "default-src 'self'; connect-src 'self' https://api.dev.cv.ikiwii.com https://auth.dev.cv.ikiwii.com; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'",
             Override: true,
           },
           ContentTypeOptions: { Override: true },

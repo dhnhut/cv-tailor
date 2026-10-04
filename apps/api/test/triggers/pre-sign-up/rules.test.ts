@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'vitest';
+import { PRE_SIGN_UP_MESSAGES } from '@cv-tailor/contracts/sign-in-messages';
 import {
   decide,
   type GoogleIdentity,
   type LocalUser,
-  MESSAGES,
   readGoogleIdentity,
 } from '../../../src/triggers/pre-sign-up/rules.ts';
 
@@ -24,7 +24,7 @@ const localUser = (overrides: Partial<LocalUser> = {}): LocalUser => ({
 });
 
 // Seen live in S2-07: Cognito adds a full stop after the message, so one of our own showed "..".
-test.each(Object.entries(MESSAGES))(
+test.each(Object.entries(PRE_SIGN_UP_MESSAGES))(
   'message %s leaves the final full stop to Cognito',
   (_, text) => {
     expect(text).not.toMatch(/\.$/);
@@ -63,7 +63,7 @@ describe('readGoogleIdentity', () => {
     expect(readGoogleIdentity(`google_${GOOGLE_SUB}`, attributes)).toEqual({
       action: 'refuse',
       adrCase: 6,
-      message: MESSAGES.googleNotTrusted,
+      message: PRE_SIGN_UP_MESSAGES.googleNotTrusted,
     });
   });
 
@@ -77,7 +77,7 @@ describe('readGoogleIdentity', () => {
     expect(readGoogleIdentity(userName, VERIFIED_GMAIL)).toEqual({
       action: 'refuse',
       adrCase: 'other',
-      message: MESSAGES.failed,
+      message: PRE_SIGN_UP_MESSAGES.failed,
     });
   });
 });
@@ -126,7 +126,7 @@ describe('decide', () => {
     expect(decide(identity, [localUser({ emailVerified: false })])).toEqual({
       action: 'refuse',
       adrCase: 7,
-      message: MESSAGES.useYourPassword,
+      message: PRE_SIGN_UP_MESSAGES.useYourPassword,
     });
   });
 
@@ -142,7 +142,7 @@ describe('decide', () => {
   test('case 10: a FORCE_CHANGE_PASSWORD user whose email is not verified is refused', () => {
     expect(
       decide(identity, [localUser({ status: 'FORCE_CHANGE_PASSWORD', emailVerified: false })]),
-    ).toEqual({ action: 'refuse', adrCase: 10, message: MESSAGES.useYourPassword });
+    ).toEqual({ action: 'refuse', adrCase: 10, message: PRE_SIGN_UP_MESSAGES.useYourPassword });
   });
 
   test.each(['RESET_REQUIRED', 'ARCHIVED', 'COMPROMISED', 'UNKNOWN', ''])(
@@ -151,7 +151,7 @@ describe('decide', () => {
       expect(decide(identity, [localUser({ status })])).toEqual({
         action: 'refuse',
         adrCase: 'other',
-        message: MESSAGES.failed,
+        message: PRE_SIGN_UP_MESSAGES.failed,
       });
     },
   );
@@ -160,7 +160,7 @@ describe('decide', () => {
     expect(decide(identity, [localUser(), localUser({ username: 'other-uuid' })])).toEqual({
       action: 'refuse',
       adrCase: 'other',
-      message: MESSAGES.failed,
+      message: PRE_SIGN_UP_MESSAGES.failed,
     });
   });
 
