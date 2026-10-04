@@ -11,7 +11,12 @@ export default defineConfig({
     host: '127.0.0.1',
     // The dev server has no config.json. It borrows the deployed dev environment's file, so
     // local runs use the dev settings and nothing is copied into the repo (S2-04).
-    proxy: { '/config.json': { target: 'https://dev.cv.ikiwii.com', changeOrigin: true } },
+    proxy: {
+      '/config.json': { target: 'https://dev.cv.ikiwii.com', changeOrigin: true },
+      // The API, called from localhost through this server: a server-to-server call has no CORS, so
+      // dev's CORS can stay limited to the deployed web app (S2-09). Each API path is listed.
+      '/me': { target: 'https://api.dev.cv.ikiwii.com', changeOrigin: true },
+    },
   },
   test: {
     environment: 'jsdom',

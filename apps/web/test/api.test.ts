@@ -1,5 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import { ApiError, fetchMe } from '../src/api';
+import { DEV_CONFIG } from './fixtures';
+import { apiBase, ApiError, fetchMe } from '../src/api';
 
 // The web app's GET /me call (S2-09). The body is checked against the shared contract.
 
@@ -15,6 +16,13 @@ const stubFetch = (response: Response) => {
   vi.stubGlobal('fetch', fetchMock);
   return fetchMock;
 };
+
+// On the Vite dev server, API calls go to its own origin and the server proxies them to dev
+// (vite.config.ts), because the API's CORS allows only the deployed web app (S2-09).
+test('calls the API directly, except on the dev server, which proxies it', () => {
+  expect(apiBase(DEV_CONFIG, false)).toBe('https://api.dev.cv.ikiwii.com');
+  expect(apiBase(DEV_CONFIG, true)).toBe(window.location.origin);
+});
 
 test('asks the API who the caller is, with the access token', async () => {
   const fetchMock = stubFetch(Response.json({ sub: SUB, isAdmin: true }));
