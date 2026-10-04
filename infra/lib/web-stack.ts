@@ -24,6 +24,7 @@ import { BucketDeployment, CacheControl, Source } from 'aws-cdk-lib/aws-s3-deplo
 import { StringParameter } from 'aws-cdk-lib/aws-ssm';
 import type { Construct } from 'constructs';
 import type { WebConfig } from '@cv-tailor/contracts';
+import { USER_POOL_ID_PARAMETER, WEB_CLIENT_ID_PARAMETER } from './auth-stack.ts';
 import { CERTIFICATE_ARN_PARAMETER } from './certificate-stack.ts';
 import { ZONE_ID_PARAMETER } from './zone-stack.ts';
 
@@ -40,19 +41,24 @@ export const SPA_ROUTING_CODE = `function handler(event) {
   return request;
 }`;
 
+// The parts of /config.json known at synth. The pool and client IDs exist only once <env>-Auth
+// deploys, so the stack adds them at deploy time (S2-10).
+export type WebConfigAtSynth = Omit<WebConfig, 'userPoolId' | 'webClientId'>;
+
 export interface WebStackProps extends StackProps {
   readonly host: string;
-  readonly config: WebConfig; // written to /config.json
+  readonly config: WebConfigAtSynth; // written to /config.json, with the pool and client IDs added
   readonly siteDirectory: string; // the web app's build output
 }
 
-// Everything comes from this origin only, except API calls, which go to api.<host> (S2-09).
-// base-uri, frame-ancestors, and form-action don't fall back to default-src, so they're set
-// too. S2-10 adds the sign-in origin to connect-src, and Turnstile adds its own.
-export const contentSecurityPolicy = (apiOrigin: string): string =>
+// Everything comes from this origin only, except calls to the API (S2-09) and to the sign-in
+// endpoints at auth.<host>: the token exchange, refresh, and revocation (S2-10). Redirects to
+// managed login are page loads, which connect-src doesn't cover. base-uri, frame-ancestors, and
+// form-action don't fall back to default-src, so they're set too. Turnstile adds its own origin.
+export const contentSecurityPolicy = (apiOrigin: string, authOrigin: string): string =>
   [
     "default-src 'self'",
-    `connect-src 'self' ${apiOrigin}`, // 'self' keeps /config.json loading
+    `connect-src 'self' ${apiOrigin} ${authOrigin}`, // 'self' keeps /config.json loading
     "base-uri 'self'",
     "object-src 'none'",
     "frame-ancestors 'none'",
@@ -65,6 +71,14 @@ export class WebStack extends Stack {
   constructor(scope: Construct, id: string, props: WebStackProps) {
     const { host, config, siteDirectory, ...stackProps } = props;
     super(scope, id, stackProps);
+
+    // Read from SSM at deploy time, like the zone ID, so no export ties this stack to <env>-Auth.
+    // BucketDeployment fills the values into config.json when it uploads the file (S2-10).
+    const fullConfig: WebConfig = {
+      ...config,
+      userPoolId: StringParameter.valueForStringParameter(this, USER_POOL_ID_PARAMETER),
+      webClientId: StringParameter.valueForStringParameter(this, WEB_CLIENT_ID_PARAMETER),
+    };
 
     // Holds only build output, which every deploy uploads again, so it goes with the stack.
     const bucket = new Bucket(this, 'Site', {
@@ -90,7 +104,10 @@ export class WebStack extends Stack {
           override: true,
         },
         contentSecurityPolicy: {
-          contentSecurityPolicy: contentSecurityPolicy(new URL(config.apiUrl).origin),
+          contentSecurityPolicy: contentSecurityPolicy(
+            new URL(config.apiUrl).origin,
+            new URL(config.authUrl).origin,
+          ),
           override: true,
         },
         contentTypeOptions: { override: true },
@@ -151,7 +168,7 @@ export class WebStack extends Stack {
     const entry = new BucketDeployment(this, 'DeployEntry', {
       sources: [
         Source.asset(siteDirectory, { exclude: ['assets', 'config.json'] }),
-        Source.jsonData('config.json', config),
+        Source.jsonData('config.json', fullConfig),
       ],
       destinationBucket: bucket,
       exclude: ['assets/*'], // keeps this deployment's prune away from the hashed files

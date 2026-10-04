@@ -1,5 +1,6 @@
 // Account-linking rules for the pre sign-up trigger (S2-07, ADR-0009 §2). Pure functions with no
 // AWS calls, so each ADR case is a plain unit test. handler.ts carries out what they decide.
+import { PRE_SIGN_UP_MESSAGES } from '@cv-tailor/contracts/sign-in-messages';
 
 // The identity provider's name in the user pool. Cognito compares it case-sensitively.
 export const GOOGLE_PROVIDER = 'Google';
@@ -7,17 +8,6 @@ export const GOOGLE_PROVIDER = 'Google';
 // Gmail usernames are letters, digits, and dots. Only Gmail addresses are trusted at launch
 // (ADR-0009 §2). The strict pattern also keeps the address safe inside a ListUsers filter string.
 const GMAIL = /^[a-z0-9.]+@gmail\.com$/;
-
-// What a refused person sees. Cognito wraps it as "PreSignUp failed with error <message>." and
-// adds the final full stop itself, so the messages leave it out. For a Google sign-in, the text
-// reaches the web app's callback as error_description (ADR-0009 §2).
-export const MESSAGES = {
-  googleNotTrusted:
-    'Google sign-in works only for Gmail addresses. Please sign up with your email address and a password', // case 6
-  useYourPassword:
-    'An account with this email address already exists. Please sign in with your password', // cases 7 and 10
-  failed: 'Sign-in failed. Please try again', // anything unexpected: fail closed
-} as const;
 
 export interface GoogleIdentity {
   readonly sub: string; // Google's sub, which the link uses (not the email address)
@@ -73,13 +63,13 @@ export function readGoogleIdentity(
   const sub = userName.slice(separator + 1);
   // Only Google is trusted for linking. Another provider needs its own rule in ADR-0009 first.
   if (separator < 1 || provider !== GOOGLE_PROVIDER.toLowerCase() || sub === '') {
-    return refuse('other', MESSAGES.failed);
+    return refuse('other', PRE_SIGN_UP_MESSAGES.failed);
   }
 
   // Case 6: Google vouches only for Gmail addresses that it has verified.
   const email = (attributes.email ?? '').toLowerCase();
   if (attributes.email_verified !== 'true' || !GMAIL.test(email)) {
-    return refuse(6, MESSAGES.googleNotTrusted);
+    return refuse(6, PRE_SIGN_UP_MESSAGES.googleNotTrusted);
   }
   return { sub, email };
 }
@@ -90,7 +80,7 @@ export function decide(identity: GoogleIdentity, users: readonly LocalUser[]): D
   const [user, ...others] = users;
   if (!user) return { action: 'create-and-link', adrCase: 4 };
   // Can't happen: the email address is the username. Refuse rather than guess.
-  if (others.length > 0) return refuse('other', MESSAGES.failed);
+  if (others.length > 0) return refuse('other', PRE_SIGN_UP_MESSAGES.failed);
 
   // A retried trigger may find the link already made.
   const alreadyLinked = user.linkedGoogleSubs.includes(identity.sub);
@@ -101,14 +91,14 @@ export function decide(identity: GoogleIdentity, users: readonly LocalUser[]): D
     case 'CONFIRMED':
       return user.emailVerified
         ? { action: 'link', adrCase: 3, username: user.username, alreadyLinked }
-        : refuse(7, MESSAGES.useYourPassword);
+        : refuse(7, PRE_SIGN_UP_MESSAGES.useYourPassword);
     case 'FORCE_CHANGE_PASSWORD':
       // Case 10: created by an admin, or by a case 4 that stopped before setting the password.
       return user.emailVerified
         ? { action: 'set-password-and-link', adrCase: 10, username: user.username, alreadyLinked }
-        : refuse(10, MESSAGES.useYourPassword);
+        : refuse(10, PRE_SIGN_UP_MESSAGES.useYourPassword);
     default:
       // RESET_REQUIRED, ARCHIVED, COMPROMISED, UNKNOWN: no rule, so refuse.
-      return refuse('other', MESSAGES.failed);
+      return refuse('other', PRE_SIGN_UP_MESSAGES.failed);
   }
 }

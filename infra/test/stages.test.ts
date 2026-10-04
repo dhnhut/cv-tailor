@@ -24,8 +24,8 @@ const EXPECTED: Record<EnvironmentName, { stages: string[]; stacks: string[] }> 
     stacks: [
       'dev-Auth',
       'dev-Data',
-      'dev-Web',
       'dev-Api',
+      'dev-Web',
       'dev-AuthDomain',
       'dev-access-GithubOidc',
       'dev-baseline-Budget',
@@ -38,8 +38,8 @@ const EXPECTED: Record<EnvironmentName, { stages: string[]; stacks: string[] }> 
     stacks: [
       'stag-Auth',
       'stag-Data',
-      'stag-Web',
       'stag-Api',
+      'stag-Web',
       'stag-AuthDomain',
       'stag-access-GithubOidc',
       'stag-baseline-Budget',
@@ -50,8 +50,8 @@ const EXPECTED: Record<EnvironmentName, { stages: string[]; stacks: string[] }> 
     stacks: [
       'prod-Auth',
       'prod-Data',
-      'prod-Web',
       'prod-Api',
+      'prod-Web',
       'prod-AuthDomain',
       'prod-access-GithubOidc',
       'prod-baseline-Budget',
@@ -206,6 +206,25 @@ const API_URL: Record<EnvironmentName, string> = {
   prod: 'https://api.cv.ikiwii.com',
 };
 
-test.each(CONFIGS)('the $name web app is told its own API URL', (config) => {
-  expect(webConfigFor(config)).toEqual({ environment: config.name, apiUrl: API_URL[config.name] });
+// Written out literally: each environment's web app calls its own API and sign-in pages (ADR-0008).
+const AUTH_URL: Record<EnvironmentName, string> = {
+  dev: 'https://auth.dev.cv.ikiwii.com',
+  stag: 'https://auth.stag.cv.ikiwii.com',
+  prod: 'https://auth.cv.ikiwii.com',
+};
+
+test.each(CONFIGS)('the $name web app is told its own API and sign-in URLs', (config) => {
+  expect(webConfigFor(config)).toEqual({
+    environment: config.name,
+    apiUrl: API_URL[config.name],
+    authUrl: AUTH_URL[config.name],
+  });
+});
+
+// S2-10: config.json holds the pool and client IDs, which the web stack reads from SSM.
+test.each(CONFIGS)('the $name web app deploys after its auth stack', (config) => {
+  const { stacks } = synthStage(config.name);
+  const stack = (name: string) => stacks.find((s) => s.stackName === `${config.name}-${name}`);
+
+  expect(stack('Web')?.dependencies.map((d) => d.id)).toContain(stack('Auth')?.id);
 });

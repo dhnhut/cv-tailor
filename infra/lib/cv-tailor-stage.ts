@@ -7,7 +7,7 @@ import { ApiStack } from './api-stack.ts';
 import { AuthDomainStack } from './auth-domain-stack.ts';
 import { AuthStack } from './auth-stack.ts';
 import { DataStack, dataTableName } from './data-stack.ts';
-import { WebStack } from './web-stack.ts';
+import { WebStack, type WebConfigAtSynth } from './web-stack.ts';
 
 // The web app's build output. It must exist before synth: `pnpm run check` builds it first
 // (infra depends on @cv-tailor/web), and deploy.yml builds it before `cdk deploy`.
@@ -19,10 +19,17 @@ const WEB_DIST = fileURLToPath(new URL('../../apps/web/dist', import.meta.url));
 const PRE_SIGN_UP_DIST = fileURLToPath(new URL('../../apps/api/dist/pre-sign-up', import.meta.url));
 const ME_DIST = fileURLToPath(new URL('../../apps/api/dist/me', import.meta.url));
 
-// The web app's /config.json for one environment (S2-04, S2-09). Checked against the contract at
-// synth, so a wrong value fails `cdk synth` instead of the web app at start-up.
-export const webConfigFor = (config: EnvironmentConfig): WebConfig =>
-  WebConfig.parse({ environment: config.name, apiUrl: `https://api.${config.host}` });
+// The parts of /config.json known at synth (S2-04, S2-09, S2-10). Checked against the contract
+// here, so a wrong value fails `cdk synth` instead of the web app at start-up. The pool and client
+// IDs come from Cognito at deploy time (WebStack), so the web app checks those when it starts.
+const WebConfigAtSynth = WebConfig.omit({ userPoolId: true, webClientId: true });
+
+export const webConfigFor = (config: EnvironmentConfig): WebConfigAtSynth =>
+  WebConfigAtSynth.parse({
+    environment: config.name,
+    apiUrl: `https://api.${config.host}`,
+    authUrl: `https://auth.${config.host}`,
+  });
 
 export interface CvTailorStageProps extends StageProps {
   readonly config: EnvironmentConfig;
@@ -55,6 +62,13 @@ export class CvTailorStage extends Stage {
       googleClientId: config.googleClientId,
       preSignUpDirectory: PRE_SIGN_UP_DIST,
     });
+
+    // config.json holds the pool and client IDs, which WebStack reads from SSM. CDK can't see that
+    // (S2-10). No cycle: AuthStack doesn't depend on WebStack. AuthDomain depends on both.
+    web.addStackDependency(
+      auth,
+      'config.json holds the pool and client IDs that the auth stack writes',
+    );
 
     // CDK can't see a dependency through SSM, so both are declared (ADR-0008, S2-05).
     const authDomain = new AuthDomainStack(this, 'AuthDomain', { host: config.host });

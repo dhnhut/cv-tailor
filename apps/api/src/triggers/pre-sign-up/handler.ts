@@ -3,14 +3,9 @@
 // also invokes it for SignUp and AdminCreateUser, which it allows.
 import { CognitoIdentityProviderClient } from '@aws-sdk/client-cognito-identity-provider';
 import type { PreSignUpTriggerEvent } from 'aws-lambda';
+import { PRE_SIGN_UP_MESSAGES } from '@cv-tailor/contracts/sign-in-messages';
 import { cognitoDirectory, type UserDirectory } from './cognito.ts';
-import {
-  decide,
-  type Decision,
-  type GoogleIdentity,
-  MESSAGES,
-  readGoogleIdentity,
-} from './rules.ts';
+import { decide, type Decision, type GoogleIdentity, readGoogleIdentity } from './rules.ts';
 
 async function createAndLink(directory: UserDirectory, poolId: string, identity: GoogleIdentity) {
   const username = await directory.createUser(poolId, identity.email);
@@ -60,7 +55,7 @@ async function run(event: PreSignUpTriggerEvent, directory: UserDirectory): Prom
     case 'PreSignUp_ExternalProvider':
       return await linkGoogleSignIn(event, directory);
     default:
-      return { action: 'refuse', adrCase: 'other', message: MESSAGES.failed };
+      return { action: 'refuse', adrCase: 'other', message: PRE_SIGN_UP_MESSAGES.failed };
   }
 }
 
@@ -85,7 +80,7 @@ export const createHandler =
       );
       // No `cause`: Lambda logs a thrown error, and the original's message may hold the address.
       // eslint-disable-next-line preserve-caught-error
-      throw new Error(MESSAGES.failed);
+      throw new Error(PRE_SIGN_UP_MESSAGES.failed);
     }
 
     const { action, adrCase } = decision;
