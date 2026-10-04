@@ -1,4 +1,4 @@
-import { MeResponse } from '@cv-tailor/contracts';
+import { MeResponse, type WebConfig } from '@cv-tailor/contracts';
 
 // Calls to the CV Tailor API (S2-09). Each call sends the access token, never the ID token: the
 // API accepts access tokens only (ADR-0009 §6). S2-10 passes the signed-in user's token.
@@ -23,3 +23,8 @@ export async function fetchMe(apiUrl: string, accessToken: string): Promise<MeRe
   if (!response.ok) throw new ApiError(response.status);
   return MeResponse.parse(await response.json());
 }
+
+// Where API calls go. On the Vite dev server they go to its own origin, which proxies them to dev
+// (vite.config.ts), because the API's CORS allows only the deployed web app (S2-09).
+export const apiBase = (config: WebConfig, isDev: boolean): string =>
+  isDev ? window.location.origin : config.apiUrl;

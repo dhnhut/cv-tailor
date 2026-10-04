@@ -21,14 +21,28 @@ const importMain = async () => {
   });
 };
 
-test('loads the settings, then mounts the app into #root', async () => {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(DEV_CONFIG)));
-  await importMain();
-  expect(screen.getByRole('heading', { level: 1, name: 'CV Tailor' })).toBeInstanceOf(
-    HTMLHeadingElement,
-  );
-  expect(screen.getByText('dev')).toBeInstanceOf(HTMLParagraphElement);
-});
+// The only web test that imports the whole app while it runs: the router, the sign-in libraries,
+// and every page, transformed for coverage. That takes about 0.5 s alone, but under the parallel
+// `pnpm run check` it went past the 5 s default, as infra's synth tests did (infra/vitest.config.ts).
+const IMPORTS_THE_APP_TIMEOUT = 30_000; // 30 seconds
+
+test(
+  'loads the settings, then mounts the app into #root',
+  async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(DEV_CONFIG)));
+    await importMain();
+    expect(screen.getByRole('heading', { level: 1, name: 'CV Tailor' })).toBeInstanceOf(
+      HTMLHeadingElement,
+    );
+    expect(screen.getByText('dev')).toBeInstanceOf(HTMLParagraphElement);
+    // main.tsx built a real UserManager. It reads session storage after the first render, so wait
+    // for its signed-out state: the update then happens inside the test, with no act() warning.
+    expect(await screen.findByRole('button', { name: 'Sign in' })).toBeInstanceOf(
+      HTMLButtonElement,
+    );
+  },
+  IMPORTS_THE_APP_TIMEOUT,
+);
 
 test('shows an error instead of a blank page when the settings fail to load', async () => {
   const failure = new TypeError('Failed to fetch');
