@@ -18,7 +18,7 @@ dev = [
   "pytest>=9.1.1",
   "pytest-cov>=7.1.0",
   "ruff>=0.16.9",
-  "types-boto3[bedrock-runtime,ssm]>=1.43.108",
+  "types-boto3[bedrock-agent,bedrock-agent-runtime,bedrock-runtime,cloudformation,s3,ssm]>=1.43.108",
 ]
 
 [tool.ruff]

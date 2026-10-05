@@ -10,5 +10,5 @@
     // only; every other package keeps it (S2-04).
     "exactOptionalPropertyTypes": false
   },
-  "include": ["bin", "config", "lib", "test", "vitest.config.ts"]
+  "include": ["bin", "config", "lib", "spikes", "test", "vitest.config.ts"]
 }
