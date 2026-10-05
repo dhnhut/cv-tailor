@@ -345,6 +345,7 @@ describe('errors and logs', () => {
       triggerSource: 'PreSignUp_ExternalProvider',
       adrCase: 4,
       action: 'create-and-link',
+      hd: 'absent',
       durationMs: 250,
     });
     expect(logged()).not.toContain(EMAIL);
@@ -361,6 +362,23 @@ describe('errors and logs', () => {
     ).rejects.toThrow(PRE_SIGN_UP_MESSAGES.googleNotTrusted);
     expect(logged()).toContain('"action":"refuse"');
     expect(logged()).not.toContain('bob@company.com');
+  });
+
+  // The S2-13 spike reads this field to see whether Cognito passes Google's hd claim through.
+  test('a refused Workspace sign-in logs whether hd matched, but not the domain', async () => {
+    const pool = fakePool();
+    await expect(
+      createHandler(pool.directory)(
+        googleSignIn({ email: 'bob@uni.ac.nz', email_verified: 'true', 'custom:hd': 'uni.ac.nz' }),
+      ),
+    ).rejects.toThrow(PRE_SIGN_UP_MESSAGES.googleNotTrusted);
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({ adrCase: 6, hd: 'matches' });
+    expect(logged()).not.toContain('uni.ac.nz');
+  });
+
+  test('a sign-up that is not a Google sign-in logs no hd field', async () => {
+    await createHandler(fakePool().directory)(event('PreSignUp_SignUp'));
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).not.toHaveProperty('hd');
   });
 });
 

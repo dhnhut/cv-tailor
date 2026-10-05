@@ -5,7 +5,13 @@ import { CognitoIdentityProviderClient } from '@aws-sdk/client-cognito-identity-
 import type { PreSignUpTriggerEvent } from 'aws-lambda';
 import { PRE_SIGN_UP_MESSAGES } from '@cv-tailor/contracts/sign-in-messages';
 import { cognitoDirectory, type UserDirectory } from './cognito.ts';
-import { decide, type Decision, type GoogleIdentity, readGoogleIdentity } from './rules.ts';
+import {
+  decide,
+  type Decision,
+  type GoogleIdentity,
+  hdStatus,
+  readGoogleIdentity,
+} from './rules.ts';
 
 async function createAndLink(directory: UserDirectory, poolId: string, identity: GoogleIdentity) {
   const username = await directory.createUser(poolId, identity.email);
@@ -89,6 +95,10 @@ export const createHandler =
         triggerSource: event.triggerSource,
         adrCase,
         action,
+        // Whether Google's hd claim arrived and matches the address. Never the domain (SAFE-04).
+        ...(event.triggerSource === 'PreSignUp_ExternalProvider'
+          ? { hd: hdStatus(event.request.userAttributes) }
+          : {}),
         durationMs: now() - started,
       }),
     );

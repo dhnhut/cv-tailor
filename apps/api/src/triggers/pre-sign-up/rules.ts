@@ -9,6 +9,12 @@ export const GOOGLE_PROVIDER = 'Google';
 // (ADR-0009 §2). The strict pattern also keeps the address safe inside a ListUsers filter string.
 const GMAIL = /^[a-z0-9.]+@gmail\.com$/;
 
+// Google's hd claim, mapped to this attribute (S2-13). Google sends it only for Workspace (and Cloud
+// Identity) accounts. It holds the domain of the account's organization.
+export const HD_ATTRIBUTE = 'custom:hd';
+
+export type HdStatus = 'absent' | 'matches' | 'differs';
+
 export interface GoogleIdentity {
   readonly sub: string; // Google's sub, which the link uses (not the email address)
   readonly email: string; // lowercased
@@ -50,6 +56,16 @@ const refuse = (adrCase: RefusedCase, message: string): Decision => ({
   adrCase,
   message,
 });
+
+// Whether hd arrived, and whether it equals the domain of the address. Both are lowercased. The
+// handler logs this status, never the domain (SAFE-04).
+export function hdStatus(attributes: Readonly<Record<string, string>>): HdStatus {
+  const hd = (attributes[HD_ATTRIBUTE] ?? '').toLowerCase();
+  if (hd === '') return 'absent';
+  const email = (attributes.email ?? '').toLowerCase();
+  const at = email.lastIndexOf('@');
+  return at >= 0 && email.slice(at + 1) === hd ? 'matches' : 'differs';
+}
 
 // Step A: does Google vouch for this identity? On a federated first sign-in, userName is
 // "<provider>_<provider's sub>", for example "google_1234". Cognito sets the prefix, not the

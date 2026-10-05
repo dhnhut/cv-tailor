@@ -7,6 +7,7 @@ import {
   OAuthScope,
   ProviderAttribute,
   ResourceServerScope,
+  StringAttribute,
   UserPool,
   UserPoolClientIdentityProvider,
   UserPoolEmail,
@@ -73,6 +74,10 @@ export class AuthStack extends Stack {
       signInAliases: { email: true }, // the email address is the username
       signInCaseSensitive: false, // CDK's default is true
       standardAttributes: { email: { required: true, mutable: true } }, // Google updates it (S2-06)
+      // Google's hd claim: the Workspace domain of a Google account (S2-13, ADR-0009 §2). Permanent:
+      // Cognito can't remove or change a custom attribute. Mutable, because Cognito rewrites mapped
+      // attributes at sign-in, and an immutable one would make that sign-in fail.
+      customAttributes: { hd: new StringAttribute({ mutable: true }) },
       selfSignUpEnabled: true, // the web app's sign-up form will call SignUp (ADR-0009 §8)
       autoVerify: { email: true }, // a sign-up confirms its email with an emailed code
       keepOriginal: { email: true }, // a new email address is used only once it's verified
@@ -120,7 +125,8 @@ export class AuthStack extends Stack {
 
     // Google sign-in (S2-06). Asks Google only for the email address (SAFE-04), and maps whether
     // Google verified it: mapped emails are unverified otherwise, and the pre sign-up trigger
-    // links accounts only on a verified address (S2-07).
+    // links accounts only on a verified address (S2-07). It also maps hd, so the trigger can tell
+    // a Google Workspace account (S2-13).
     const google = googleClientId
       ? new UserPoolIdentityProviderGoogle(this, 'Google', {
           userPool,
@@ -130,6 +136,8 @@ export class AuthStack extends Stack {
           attributeMapping: {
             email: ProviderAttribute.GOOGLE_EMAIL,
             emailVerified: ProviderAttribute.GOOGLE_EMAIL_VERIFIED,
+            // CDK passes these keys through as they are, so the key needs the custom: prefix.
+            custom: { 'custom:hd': ProviderAttribute.other('hd') },
           },
         })
       : undefined;
