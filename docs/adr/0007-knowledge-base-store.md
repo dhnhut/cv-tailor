@@ -54,6 +54,8 @@ Rejected, because it fails driver 2.
 
 Candidates can upload `.txt`, `.md`, `.html`, `.doc`/`.docx`, and `.pdf`, up to **50 MB per file**, which is the knowledge base's own limit. Each candidate can store up to **50 MB in total** (KB-06). A single file at the maximum size fills the whole allowance.
 
+The S2-12 spike found that the managed S3 connector's own file size filter (`maxFileSizeInMegaBytes`) defaults to 500 MB, while the formats page (source 5) gives 50 MB without saying whether it covers managed knowledge bases. The 50 MB cap holds either way, because it is also the product's limit (KB-03). Sprint 3 enforces it at upload and sets the connector's filter to 50 MB.
+
 ### Isolation model
 
 - ACL awareness is turned on for the S3 data source (`aclEnabled: true`).
@@ -86,12 +88,12 @@ Candidates can upload `.txt`, `.md`, `.html`, `.doc`/`.docx`, and `.pdf`, up to 
 
 ### Risks and mitigations
 
-| Risk                                                                     | Mitigation                                                                                                                                                                                                      |
-| ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| The service rejects a synthetic, non-deliverable address as an identity. | The Sprint 2 spike tests it first. The fallback is the verified real email, with ACL files rewritten when a user changes their email, and deleted when the account is deleted.                                  |
-| The backend passes the wrong identity.                                   | One function builds the identity from the verified token, and every Retrieve call goes through it. Tests check that candidate A can't retrieve candidate B's document.                                          |
-| A document contains hidden instructions (for example hidden HTML text).  | Retrieved content is untrusted data (SAFE-01), never instructions.                                                                                                                                              |
-| CDK has no construct for the managed knowledge base yet.                 | CloudFormation has `AWS::Bedrock::KnowledgeBase` with `ManagedKnowledgeBaseConfiguration`. The Sprint 2 spike confirms the CDK L1 construct supports it; if not, the resource is defined as raw CloudFormation. |
+| Risk                                                                     | Mitigation                                                                                                                                                                                                                                                      |
+| ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The service rejects a synthetic, non-deliverable address as an identity. | The Sprint 2 spike tests it first. The fallback is the verified real email, with ACL files rewritten when a user changes their email, and deleted when the account is deleted. Checked in S2-12: the service accepts it.                                        |
+| The backend passes the wrong identity.                                   | One function builds the identity from the verified token, and every Retrieve call goes through it. Tests check that candidate A can't retrieve candidate B's document.                                                                                          |
+| A document contains hidden instructions (for example hidden HTML text).  | Retrieved content is untrusted data (SAFE-01), never instructions.                                                                                                                                                                                              |
+| CDK has no construct for the managed knowledge base yet.                 | CloudFormation has `AWS::Bedrock::KnowledgeBase` with `ManagedKnowledgeBaseConfiguration`. The Sprint 2 spike confirms the CDK L1 construct supports it; if not, the resource is defined as raw CloudFormation. Checked in S2-12: the L1 construct supports it. |
 
 ### When to revisit this decision
 
@@ -100,11 +102,28 @@ Candidates can upload `.txt`, `.md`, `.html`, `.doc`/`.docx`, and `.pdf`, up to 
 
 ## Verification
 
-Spike S2-08, in `dev`:
+Spike S2-12, in `dev`:
 
 1. `cdk synth` produces a managed knowledge base with an ACL-enabled S3 data source.
 2. Two documents are uploaded, each with an ACL for a different synthetic identity, A and B. A Retrieve as A returns only A's document, a Retrieve as B returns only B's, and a Retrieve as an unknown identity returns nothing.
 3. A document uploaded without an ACL file is not ingested.
+
+### Results (S2-12, 2026-10-05)
+
+Run in `dev` with the spike stack in `infra/spikes/` and `services/agents/scripts/kb_spike_check.py`. The identities were made-up `sub` values in Cognito's format, and the documents held no personal data.
+
+1. **Pass.** In aws-cdk-lib 2.271.0, the L1 `CfnKnowledgeBase` supports `ManagedKnowledgeBaseConfiguration`. `cdk synth` produced a `MANAGED` knowledge base and a `MANAGED_KNOWLEDGE_BASE_CONNECTOR` S3 data source with `aclEnabled: true`, and CloudFormation deployed both. `connectorParameters` is free-form JSON that neither CloudFormation nor CDK checks before deploy, so a test pins it.
+2. **Pass.** The ACLs named `<sub>@users.cv-tailor.invalid`. A Retrieve as A returned only A's document, and a Retrieve as B only B's. An unknown identity, and a request without `userContext`, returned nothing. The service accepts the synthetic identities. A control document for an `example.com` address behaved the same way.
+3. **Pass.** The document without an ACL file was never returned, and `ListKnowledgeBaseDocuments` doesn't list it. The first sync counted it in `numberOfDocumentsFailed`. A later sync counted it nowhere, and reported only "The sync completed with partial failures. Some documents could not be crawled." Neither sync named the document.
+
+Observations:
+
+- ACLs took effect as soon as the sync completed: 61 seconds for four small files.
+- `userId` matching is case-insensitive.
+- Retrieve returns a document's location as `https://<bucket>.s3.amazonaws.com/<key>`, and `ListKnowledgeBaseDocuments` as `s3://<bucket>/<key>`.
+- Overwriting an unchanged file re-indexes it, because the object's modified time changes.
+- The service stores `connectorParameters` as a JSON string, and adds its defaults: image extraction on, and a 500 MB file size filter.
+- Ingestion doesn't name a document it drops for a missing ACL, so the upload must make sure every document has its ACL file.
 
 ## Sources
 
@@ -118,3 +137,10 @@ Accessed 2026-10-01.
 6. Amazon Bedrock pricing (Managed Knowledge Base): <https://aws.amazon.com/bedrock/pricing/>
 7. CloudFormation `ManagedKnowledgeBaseConfiguration`: <https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-properties-bedrock-knowledgebase-managedknowledgebaseconfiguration.html>
 8. Managed Knowledge Base launch announcement: <https://aws.amazon.com/about-aws/whats-new/2026/06/amazon-bedrock-managed-knowledge-base/>
+
+Added by S2-12, accessed 2026-10-05.
+
+9. Create a managed knowledge base: <https://docs.aws.amazon.com/bedrock/latest/userguide/kb-managed-create.html>
+10. Service role for managed knowledge bases: <https://docs.aws.amazon.com/bedrock/latest/userguide/kb-managed-permissions.html>
+11. ACL-aware retrieval (`userContext`): <https://docs.aws.amazon.com/bedrock/latest/userguide/kb-test-retrieve-acl.html>
+12. Sync a data source: <https://docs.aws.amazon.com/bedrock/latest/userguide/kb-managed-sync.html>
