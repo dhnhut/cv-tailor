@@ -98,6 +98,15 @@ export const DNS: Partial<Record<EnvironmentName, DnsConfig>> = {
   },
 };
 
+// The kill switch's value when its parameter is first created (S2-11, ADMIN-03). After that it's
+// changed with the AWS CLI (kill switch runbook). stag and prod stay off until their first release.
+export type AiCallsSwitch = 'enabled' | 'disabled';
+export const AI_CALLS_INITIAL: Record<EnvironmentName, AiCallsSwitch> = {
+  dev: 'enabled',
+  stag: 'disabled',
+  prod: 'disabled',
+};
+
 export interface EnvironmentConfig {
   readonly name: EnvironmentName;
   readonly account: string;
@@ -108,6 +117,7 @@ export interface EnvironmentConfig {
   readonly dns?: DnsConfig; // absent: the environment has no DNS stage yet
   readonly webOrigins: readonly string[]; // where the web app runs, for sign-in callbacks (S2-05)
   readonly googleClientId?: string; // absent: no Google sign-in yet (S2-06)
+  readonly aiCallsInitial: AiCallsSwitch;
 }
 
 // Check for missing or invalid environment variables.
@@ -161,6 +171,7 @@ export function loadEnvironments(
       alertEmail: placeholder ? PLACEHOLDER_ALERT_EMAIL : (env[ALERT_EMAIL_VAR] as string),
       ...(dns ? { dns } : {}),
       ...(googleClientId ? { googleClientId } : {}),
+      aiCallsInitial: AI_CALLS_INITIAL[name],
     };
   });
 }

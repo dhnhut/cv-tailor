@@ -2,7 +2,7 @@
 
 The Python agent service for CV Tailor. The agents run with LangChain and LangGraph on AWS Bedrock AgentCore (see `AGENTS.md` §5).
 
-At this stage the package is a skeleton: one `health()` function and one test. The agent modules come in a later sprint.
+At this stage the package holds the AI call guard (S2-11) and a `health()` function. The agent modules come in Sprint 3.
 
 ## Setup
 
@@ -13,7 +13,7 @@ cd services/agents
 uv sync
 ```
 
-`uv sync` creates `.venv/` with Python 3.12 and installs the package in editable mode, together with the `dev` dependency group (ruff, mypy, pytest, pytest-cov).
+`uv sync` creates `.venv/` with Python 3.12 and installs the package in editable mode, together with the `dev` dependency group (ruff, mypy, pytest, pytest-cov, and `types-boto3` for typed AWS clients).
 
 ## Commands
 
@@ -35,6 +35,41 @@ uv sync
 
 The `.coverage` data file is gitignored.
 
+## AI call guard
+
+Every paid AI call goes through `cv_tailor_agents.ai_guard` (S2-11, ADMIN-03, QUOTA-04). It creates the only Bedrock client in the package. `tests/ai_guard/test_boundary.py` fails if any other module creates one, or imports a library that builds its own (`langchain_aws`, `anthropic`).
+
+```python
+from cv_tailor_agents.ai_guard import bedrock_runtime_client
+
+client = bedrock_runtime_client()
+client.converse(modelId=..., messages=[...], inferenceConfig={"maxTokens": 500})
+```
+
+The guard is a botocore hook. It runs before botocore builds, signs, or sends the request, so a refused call never leaves the process. It checks, in this order:
+
+| Check       | Refused with      | Rule                                                                                                                                                                           |
+| ----------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Operation   | `AiCallRefused`   | Only `Converse` and `ConverseStream`. Other operations are added later, each with its own checks.                                                                              |
+| Output cap  | `AiCallRefused`   | `inferenceConfig.maxTokens` is set, from 1 to `MAX_OUTPUT_TOKENS` (4,096). A call that asks for more is a bug, so it's refused, not reduced.                                    |
+| Input cap   | `AiCallRefused`   | At most `MAX_INPUT_BYTES` (100,000) UTF-8 bytes of keys and strings. Image, document, and video blocks are refused for now. The `limits.py` docstring says why bytes are used. |
+| Kill switch | `AiCallsDisabled` | The SSM parameter `/cv-tailor/ai-calls` must be exactly `enabled`. It's read at most once every 30 seconds per process. A read error blocks the call and isn't cached.          |
+
+- **`AiCallRefused`** means a bug in the caller.
+- **`AiCallsDisabled`** isn't a bug: the caller tells the user AI is paused.
+- Both are subclasses of `AiCallBlocked`, and neither message contains request content (SAFE-04).
+
+In AWS, the guard's role needs `ssm:GetParameter` on the parameter. To turn the switch on and off, see the [kill switch runbook](../../docs/runbooks/kill-switch.md).
+
+### Live check
+
+`scripts/ai_guard_check.py` sends a tiny Converse call through the guard every few seconds, using Amazon Nova Micro with 5 output tokens, so you can watch the kill switch take effect:
+
+```bash
+AWS_PROFILE=cvt-dev uv run python scripts/ai_guard_check.py --minutes 3
+AWS_PROFILE=cvt-dev uv run python scripts/ai_guard_check.py --once --prompt-file ../../AGENTS.md  # bytes vs tokens
+```
+
 ## Running from the repo root
 
 `package.json` is a thin wrapper. Its `lint`, `typecheck`, and `test` scripts only call `uv run`, so the root `pnpm run check` covers this service together with the TypeScript packages. uv still owns every Python dependency. See [ADR-0001](../../docs/adr/0001-monorepo-pnpm-workspaces.md).
@@ -51,6 +86,7 @@ This package has no npm dependencies. With pnpm 12.5.1, `pnpm install` may not a
 services/agents/
 ├── src/cv_tailor_agents/   # the package (src layout, typed via py.typed)
 ├── tests/                  # pytest tests; they import the installed package
+├── scripts/                # manual checks against AWS; not part of the package
 ├── evals/                  # evaluation benchmark (placeholder)
 ├── pyproject.toml          # project metadata and tool config
 ├── uv.lock

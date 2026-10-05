@@ -19,6 +19,7 @@ describe('loadEnvironments', () => {
       {
         name: 'dev',
         account: '111111111111',
+        aiCallsInitial: 'enabled',
         region: REGION,
         host: 'dev.cv.ikiwii.com',
         webOrigins: ['https://dev.cv.ikiwii.com', 'http://localhost:5173'],
@@ -30,6 +31,7 @@ describe('loadEnvironments', () => {
       {
         name: 'stag',
         account: '222222222222',
+        aiCallsInitial: 'disabled',
         region: REGION,
         host: 'stag.cv.ikiwii.com',
         webOrigins: ['https://stag.cv.ikiwii.com'],
@@ -39,6 +41,7 @@ describe('loadEnvironments', () => {
       {
         name: 'prod',
         account: '333333333333',
+        aiCallsInitial: 'disabled',
         region: REGION,
         host: 'cv.ikiwii.com',
         webOrigins: ['https://cv.ikiwii.com'],

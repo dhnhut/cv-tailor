@@ -29,6 +29,7 @@ const EXPECTED: Record<EnvironmentName, { stages: string[]; stacks: string[] }> 
       'dev-AuthDomain',
       'dev-access-GithubOidc',
       'dev-baseline-Budget',
+      'dev-baseline-KillSwitch',
       'dev-dns-Zone',
       'dev-dns-Certificate',
     ],
@@ -43,6 +44,7 @@ const EXPECTED: Record<EnvironmentName, { stages: string[]; stacks: string[] }> 
       'stag-AuthDomain',
       'stag-access-GithubOidc',
       'stag-baseline-Budget',
+      'stag-baseline-KillSwitch',
     ],
   },
   prod: {
@@ -55,6 +57,7 @@ const EXPECTED: Record<EnvironmentName, { stages: string[]; stacks: string[] }> 
       'prod-AuthDomain',
       'prod-access-GithubOidc',
       'prod-baseline-Budget',
+      'prod-baseline-KillSwitch',
       'prod-dns-Zone',
     ],
   },

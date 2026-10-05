@@ -9,7 +9,7 @@ Step-by-step procedures for operating CV Tailor's AWS accounts and deployments. 
 | [Users and admins](users-and-admins.md)       | Adding or removing an admin, or looking up a user.                                                     | ADR-0009 §7        |
 | [Google sign-in](google-sign-in.md)           | Setting up Google sign-in, rotating its client secret, or Google sign-in fails.                        | ADR-0009 §4        |
 | [Budget alarm response](budget-alarm.md)      | A budget alert email arrives, or spend looks wrong.                                                    | `AGENTS.md` §8     |
-| [Kill switch](kill-switch.md)                 | Placeholder. The feature doesn't exist yet.                                                            | ADMIN-03           |
+| [Kill switch](kill-switch.md)                 | AI spend or abuse means every AI call must stop now, or you're checking or restoring the switch.       | ADMIN-03           |
 
 The Organization guardrails (SCPs and the organization CloudTrail trail) are applied with the commands in [`infra/org/README.md`](../../infra/org/README.md), not repeated here.
 
@@ -27,5 +27,4 @@ The Organization guardrails (SCPs and the organization CloudTrail trail) are app
 
 ## Later
 
-- Kill switch (ADMIN-03), when the feature is built.
 - Investigating agent failures, when the first agent is deployed.
