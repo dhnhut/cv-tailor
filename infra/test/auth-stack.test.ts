@@ -39,7 +39,20 @@ describe('Auth stack', () => {
       UserPoolTier: 'ESSENTIALS',
       UsernameAttributes: ['email'],
       UsernameConfiguration: { CaseSensitive: false },
-      Schema: [{ Name: 'email', Required: true, Mutable: true }],
+      Schema: [
+        { Name: 'email', Required: true, Mutable: true },
+        { Name: 'hd', AttributeDataType: 'String', Mutable: true },
+      ],
+    });
+  });
+
+  // Google's hd claim lands in custom:hd (S2-13). Cognito rewrites mapped attributes at sign-in,
+  // so an immutable one would make every later Google sign-in fail, and it can't be changed after.
+  test('has a mutable custom:hd attribute with no length limits, in every environment', () => {
+    template.hasResourceProperties('AWS::Cognito::UserPool', {
+      Schema: Match.arrayWith([
+        Match.objectEquals({ Name: 'hd', AttributeDataType: 'String', Mutable: true }),
+      ]),
     });
   });
 
@@ -246,7 +259,7 @@ describe('Auth stack with Google sign-in', () => {
   );
   const [googleId] = Object.keys(template.findResources('AWS::Cognito::UserPoolIdentityProvider'));
 
-  test('asks Google only for the email address, and maps whether Google verified it', () => {
+  test('asks Google only for the email address, and maps whether Google verified it, and hd', () => {
     template.resourceCountIs('AWS::Cognito::UserPoolIdentityProvider', 1);
     template.hasResourceProperties(
       'AWS::Cognito::UserPoolIdentityProvider',
@@ -260,7 +273,11 @@ describe('Auth stack with Google sign-in', () => {
             '{{resolve:secretsmanager:cv-tailor/google-client-secret:SecretString:::}}',
           authorize_scopes: 'openid email',
         },
-        AttributeMapping: { email: 'email', email_verified: 'email_verified' },
+        AttributeMapping: {
+          email: 'email',
+          email_verified: 'email_verified',
+          'custom:hd': 'hd', // S2-13: the trigger tells a Workspace account by it
+        },
       }),
     );
   });

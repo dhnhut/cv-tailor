@@ -3,6 +3,7 @@ import { PRE_SIGN_UP_MESSAGES } from '@cv-tailor/contracts/sign-in-messages';
 import {
   decide,
   type GoogleIdentity,
+  hdStatus,
   type LocalUser,
   readGoogleIdentity,
 } from '../../../src/triggers/pre-sign-up/rules.ts';
@@ -30,6 +31,31 @@ test.each(Object.entries(PRE_SIGN_UP_MESSAGES))(
     expect(text).not.toMatch(/\.$/);
   },
 );
+
+// Whether Google's hd claim, mapped to custom:hd, arrived and matches the address (S2-13).
+describe('hdStatus', () => {
+  test.each([
+    ['missing', { email: 'bob@uni.ac.nz' }],
+    ['empty', { email: 'bob@uni.ac.nz', 'custom:hd': '' }],
+  ])('is absent when hd is %s', (_, attributes) => {
+    expect(hdStatus(attributes)).toBe('absent');
+  });
+
+  test('matches when the domain of the address equals hd, ignoring case', () => {
+    expect(hdStatus({ email: 'Bob@Uni.AC.nz', 'custom:hd': 'UNI.ac.nz' })).toBe('matches');
+  });
+
+  test.each([
+    ['another domain', 'bob@other.com'],
+    ['a subdomain of hd', 'bob@mail.uni.ac.nz'],
+    ['a parent domain of hd', 'bob@ac.nz'],
+    ['no @ at all', 'uni.ac.nz'],
+    ['no email', undefined],
+  ])('differs for %s', (_, email) => {
+    const attributes = { 'custom:hd': 'uni.ac.nz', ...(email ? { email } : {}) };
+    expect(hdStatus(attributes)).toBe('differs');
+  });
+});
 
 describe('readGoogleIdentity', () => {
   test('accepts a verified Gmail address, and reads the Google sub from the username', () => {
