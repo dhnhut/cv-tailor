@@ -1,12 +1,12 @@
 # ADR-0005: MVP Scope
 
-| Field       | Value                                                                                                                   |
-| ----------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Status      | Accepted                                                                                                                |
-| Date        | 2026-10-01                                                                                                              |
-| Amended     | 2026-10-02: CAPTCHA (Cloudflare Turnstile) moves from slice I into slice A ([ADR-0009](0009-sign-in-and-api-access.md)) |
-| Deciders    | Project owner                                                                                                           |
-| Sprint item | S1-13                                                                                                                   |
+| Field       | Value                                                                                                                                                                                                                                                                      |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status      | Accepted                                                                                                                                                                                                                                                                   |
+| Date        | 2026-10-01                                                                                                                                                                                                                                                                 |
+| Amended     | 2026-10-02: CAPTCHA (Cloudflare Turnstile) moves from slice I into slice A ([ADR-0009](0009-sign-in-and-api-access.md)); 2026-10-05: LinkedIn sign-in moves to slice I, and Google Workspace sign-in joins slice A (Sprint 2) ([ADR-0009](0009-sign-in-and-api-access.md)) |
+| Deciders    | Project owner                                                                                                                                                                                                                                                              |
+| Sprint item | S1-13                                                                                                                                                                                                                                                                      |
 
 ## Context
 
@@ -71,33 +71,33 @@ Rejected, because it fails drivers 1, 2, and 3.
 
 ### MVP
 
-| Slice | Notes                                                                                                                                                                                                                                    |
-| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A     | Google is the first OAuth provider. LinkedIn joins the MVP only if a time-boxed spike shows it works as a Cognito OIDC provider without a proxy or custom code. The sign-up CAPTCHA is built before the first `prod` release (Sprint 6). |
-| B     | Candidate: USD 0.10 per day and USD 0.50 per month. Admin: USD 1 per day and USD 5 per month.                                                                                                                                            |
-| C     | Storage cap: 50 MB per candidate.                                                                                                                                                                                                        |
-| D     | A full generation must cost USD 0.10 or less, so it fits a candidate's daily quota.                                                                                                                                                      |
-| E     | —                                                                                                                                                                                                                                        |
-| F     | —                                                                                                                                                                                                                                        |
-| H     | Links: public pages only, meaning pages that load without signing in. Files: `.doc`/`.docx`, `.pdf`, and images (`.png`, `.jpeg`, `.gif`, `.webp`).                                                                                      |
-| R     | `prod` is served at `cv.ikiwii.com`, `stag` at `stag.cv.ikiwii.com`, and `dev` at `dev.cv.ikiwii.com` ([ADR-0008](0008-domain-and-dns.md)).                                                                                              |
+| Slice | Notes                                                                                                                                                                                                                                                                      |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A     | Google is the only OAuth provider in the MVP. It accepts Gmail addresses, and Google Workspace addresses if Sprint 2's spike shows that Cognito passes the `hd` claim to the pre sign-up trigger. The sign-up CAPTCHA is built before the first `prod` release (Sprint 6). |
+| B     | Candidate: USD 0.10 per day and USD 0.50 per month. Admin: USD 1 per day and USD 5 per month.                                                                                                                                                                              |
+| C     | Storage cap: 50 MB per candidate.                                                                                                                                                                                                                                          |
+| D     | A full generation must cost USD 0.10 or less, so it fits a candidate's daily quota.                                                                                                                                                                                        |
+| E     | —                                                                                                                                                                                                                                                                          |
+| F     | —                                                                                                                                                                                                                                                                          |
+| H     | Links: public pages only, meaning pages that load without signing in. Files: `.doc`/`.docx`, `.pdf`, and images (`.png`, `.jpeg`, `.gif`, `.webp`).                                                                                                                        |
+| R     | `prod` is served at `cv.ikiwii.com`, `stag` at `stag.cv.ikiwii.com`, and `dev` at `dev.cv.ikiwii.com` ([ADR-0008](0008-domain-and-dns.md)).                                                                                                                                |
 
 ### Order
 
-| Sprint | Slices                                                                                                                                                                |
-| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2      | A (including DNS on `dev.cv.ikiwii.com`, Google sign-in, and account linking), the kill switch and max tokens part of B, the knowledge base spike, the LinkedIn spike |
-| 3      | C, plus a first JD Analyzer on a JD given as text, behind the kill switch                                                                                             |
-| 4      | D: the full agent graph, the Reviewer, and the evaluation benchmark in CI                                                                                             |
-| 5      | F and H                                                                                                                                                               |
-| 6      | The rest of B (quota), E, R, the sign-up CAPTCHA, hardening, and the first `prod` release                                                                             |
+| Sprint | Slices                                                                                                                                                                      |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2      | A (including DNS on `dev.cv.ikiwii.com`, Google sign-in, and account linking), the kill switch and max tokens part of B, the knowledge base spike, Google Workspace sign-in |
+| 3      | C, plus a first JD Analyzer on a JD given as text, behind the kill switch                                                                                                   |
+| 4      | D: the full agent graph, the Reviewer, and the evaluation benchmark in CI                                                                                                   |
+| 5      | F and H                                                                                                                                                                     |
+| 6      | The rest of B (quota), E, R, the sign-up CAPTCHA, hardening, and the first `prod` release                                                                                   |
 
 The kill switch and the per-request token limit come in Sprint 2, before the first AI call in Sprint 3. The full quota comes in Sprint 6, before the first `prod` release. Until then, AI features run only in `dev`, where the budget alarms and the emergency deny SCP apply.
 
 ### Later releases, in order
 
 1. G: refinement conversation
-2. I: tiers and abuse controls, and LinkedIn sign-in if it was deferred
+2. I: tiers and abuse controls, and LinkedIn sign-in
 3. J: personal chatbot
 4. K: coupons
 5. L: extra credit
