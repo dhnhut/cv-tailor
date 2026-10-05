@@ -2,6 +2,7 @@ import { Stage, type StageProps } from 'aws-cdk-lib';
 import type { Construct } from 'constructs';
 import type { EnvironmentConfig } from '../config/environments.ts';
 import { BudgetStack } from './budget-stack.ts';
+import { KillSwitchStack } from './kill-switch-stack.ts';
 
 export interface BaselineStageProps extends StageProps {
   readonly config: EnvironmentConfig;
@@ -22,5 +23,7 @@ export class BaselineStage extends Stage {
       monthlyLimitUsd: config.monthlyBudgetUsd,
       alertEmail: config.alertEmail,
     });
+
+    new KillSwitchStack(this, 'KillSwitch', { initialValue: config.aiCallsInitial });
   }
 }
