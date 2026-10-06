@@ -56,6 +56,16 @@ Candidates can upload `.txt`, `.md`, `.html`, `.doc`/`.docx`, and `.pdf`, up to 
 
 The S2-12 spike found that the managed S3 connector's own file size filter (`maxFileSizeInMegaBytes`) defaults to 500 MB, while the formats page (source 5) gives 50 MB without saying whether it covers managed knowledge bases. The 50 MB cap holds either way, because it is also the product's limit (KB-03). Sprint 3 enforces it at upload and sets the connector's filter to 50 MB.
 
+### Ingestion settings
+
+Set by the knowledge base stack (S3-06), whose test pins them:
+
+- **File size filter:** the connector skips any file over 50 MB (`maxFileSizeInMegaBytes: "50"`).
+- **Media extraction off.** Image, audio, and video extraction are `DISABLED`. No allowed upload type is an image, audio, or video file (KB-03). Image extraction would also read embedded visuals in `.pdf` and `.docx` files, such as a photo on a CV, which is personal data the agents don't need (SAFE-04). The service turns image extraction on by default. The documentation doesn't say whether a scanned, image-only PDF still yields text with it off, so S3-08's live check tests one.
+- **Deletion protection off.** With it on, a sync skips its whole delete phase when it would remove more than a set share of the index (15% by default). One knowledge base serves every candidate, so while the index is small, one candidate's delete can pass that share, and the deleted document would stay retrievable. The documents bucket's versioning guards against bulk deletion instead.
+- **Default chunking:** fixed size, 300 tokens, 20% overlap. The chunking strategy can't be changed after the data source is created, so a change means a new data source and a full sync.
+- **No global ACL file.** Each document's ACL is in its own `<file>.metadata.json`, which the S3 ACL page (source 4) gives as an alternative to the global file.
+
 ### Isolation model
 
 - ACL awareness is turned on for the S3 data source (`aclEnabled: true`).
@@ -71,6 +81,7 @@ The S2-12 spike found that the managed S3 connector's own file size filter (`max
 
 - An upload writes the document and its ACL file to S3 together, then starts an ingestion sync.
 - Deleting a document, or an account, removes both files and syncs again.
+- The documents bucket is versioned, and old versions expire after 35 days, the same window as the data table's point-in-time recovery. A deleted document can be restored within that window, and is gone for good after it.
 
 ## Consequences
 
@@ -144,3 +155,9 @@ Added by S2-12, accessed 2026-10-05.
 10. Service role for managed knowledge bases: <https://docs.aws.amazon.com/bedrock/latest/userguide/kb-managed-permissions.html>
 11. ACL-aware retrieval (`userContext`): <https://docs.aws.amazon.com/bedrock/latest/userguide/kb-test-retrieve-acl.html>
 12. Sync a data source: <https://docs.aws.amazon.com/bedrock/latest/userguide/kb-managed-sync.html>
+
+Added by S3-06, accessed 2026-10-06.
+
+13. Amazon S3 connector parameters: <https://docs.aws.amazon.com/bedrock/latest/userguide/kb-managed-ds-s3.html>
+14. Connect a data source (media extraction, deletion protection): <https://docs.aws.amazon.com/bedrock/latest/userguide/kb-managed-connect-ds.html>
+15. Customize ingestion (chunking can't change after creation): <https://docs.aws.amazon.com/bedrock/latest/userguide/kb-managed-customize-ingestion.html>

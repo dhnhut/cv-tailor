@@ -57,7 +57,7 @@ export class ApiStack extends Stack {
     // GET /me. Same settings as the pre sign-up trigger, except the timeout: two DynamoDB calls
     // with one retry each can take about 7 seconds at worst (handlers/me/handler.ts).
     const me = new LambdaFunction(this, 'Me', {
-      description: 'GET /me: who the caller is (S2-09, ADR-0009 §6)',
+      description: 'GET /me: who the caller is (S2-09, ADR-0009 section 6)',
       runtime: Runtime.NODEJS_24_X,
       architecture: Architecture.ARM_64,
       handler: 'index.handler',

@@ -101,7 +101,7 @@ export class AuthStack extends Stack {
     // The pre sign-up trigger links a first Google sign-in to the person's local user, so their
     // sub never changes (S2-07, ADR-0009 §1–§2). Cognito waits 5 seconds for it.
     const preSignUp = new LambdaFunction(this, 'PreSignUp', {
-      description: 'Links Google sign-ins to local users (S2-07, ADR-0009 §2)',
+      description: 'Links Google sign-ins to local users (S2-07, ADR-0009 section 2)',
       runtime: Runtime.NODEJS_24_X,
       architecture: Architecture.ARM_64,
       handler: 'index.handler',
