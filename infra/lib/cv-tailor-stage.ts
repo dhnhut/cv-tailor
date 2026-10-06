@@ -7,6 +7,7 @@ import { ApiStack } from './api-stack.ts';
 import { AuthDomainStack } from './auth-domain-stack.ts';
 import { AuthStack } from './auth-stack.ts';
 import { DataStack, dataTableName } from './data-stack.ts';
+import { documentsBucketName, KnowledgeBaseStack } from './knowledge-base-stack.ts';
 import { WebStack, type WebConfigAtSynth } from './web-stack.ts';
 
 // The web app's build output. It must exist before synth: `pnpm run check` builds it first
@@ -49,6 +50,14 @@ export class CvTailorStage extends Stage {
 
     const tableName = dataTableName(config.name);
     const data = new DataStack(this, 'Data', { tableName });
+
+    // Nothing reads its SSM parameters yet. S3-07 (Api) and S3-10 (agents) declare their
+    // dependency on it, as Api does for Auth.
+    new KnowledgeBaseStack(this, 'KnowledgeBase', {
+      bucketName: documentsBucketName(config.name, config.account),
+      knowledgeBaseName: `cv-tailor-${config.name}-kb`,
+      webOrigin: `https://${config.host}`,
+    });
 
     const web = new WebStack(this, 'Web', {
       host: config.host,

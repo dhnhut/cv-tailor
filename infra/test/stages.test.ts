@@ -24,6 +24,7 @@ const EXPECTED: Record<EnvironmentName, { stages: string[]; stacks: string[] }> 
     stacks: [
       'dev-Auth',
       'dev-Data',
+      'dev-KnowledgeBase',
       'dev-Api',
       'dev-Web',
       'dev-AuthDomain',
@@ -39,6 +40,7 @@ const EXPECTED: Record<EnvironmentName, { stages: string[]; stacks: string[] }> 
     stacks: [
       'stag-Auth',
       'stag-Data',
+      'stag-KnowledgeBase',
       'stag-Api',
       'stag-Web',
       'stag-AuthDomain',
@@ -52,6 +54,7 @@ const EXPECTED: Record<EnvironmentName, { stages: string[]; stacks: string[] }> 
     stacks: [
       'prod-Auth',
       'prod-Data',
+      'prod-KnowledgeBase',
       'prod-Api',
       'prod-Web',
       'prod-AuthDomain',
