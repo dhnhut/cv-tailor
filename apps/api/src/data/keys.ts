@@ -1,5 +1,7 @@
+import { randomUUIDv7 } from 'node:crypto';
+
 // Key formats for the data table (S2-08, ADR-0006). Every key in the table is built here, so a
-// format is defined once and tested once. Pure functions with no AWS calls.
+// format is defined once and tested once. No AWS calls; newId() is the only function that isn't pure.
 
 // Attribute names. infra/lib/data-stack.ts writes the same names out (PK, SK, TTL).
 export const ATTRIBUTES = { pk: 'PK', sk: 'SK', entity: 'Entity', expiresAt: 'expiresAt' } as const;
@@ -24,13 +26,17 @@ export const GENERATION_JOB_PREFIX = 'JOB#';
 
 // A Cognito sub is a lowercase UUID. The check catches a username or an email address passed by mistake.
 const SUB = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-// IDs for documents and jobs: no '#', so an ID can't add a level to the key. Sprint 3 picks the ID format.
-const ID = /^[A-Za-z0-9_-]{1,64}$/;
+// IDs for documents and jobs are lowercase UUID v7 (S3-03, ADR-0006): version 7, RFC 9562 variant.
+// The first 48 bits are the creation time in milliseconds, so DOC# and JOB# keys sort oldest first.
+const ID = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 // The message names the part, never the value: Lambda logs thrown messages (S2-07).
 const check = (part: string, value: string, pattern: RegExp): string => {
   if (!pattern.test(value)) throw new Error(`Invalid ${part} for a data table key`);
   return value;
 };
+
+// A new document or job ID. Only the API creates IDs (S3-03). Needs Node 24.16 or later.
+export const newId = (): string => randomUUIDv7();
 
 // Quota days and months are UTC (QUOTA-02). toISOString() is always UTC, whatever the host's time zone.
 const utcDate = (at: Date): string => {

@@ -1,12 +1,12 @@
 # ADR-0006: Data Store, a Single DynamoDB Table
 
-| Field       | Value                                                                                                                                                         |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Status      | Accepted                                                                                                                                                      |
-| Date        | 2026-10-01                                                                                                                                                    |
-| Amended     | 2026-10-03: the table's resource type, its guards against replacement, and UTC quota periods are recorded, and verification steps 1 and 4 are updated (S2-08) |
-| Deciders    | Project owner                                                                                                                                                 |
-| Sprint item | S1-13                                                                                                                                                         |
+| Field       | Value                                                                                                                                                                                                                                                           |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status      | Accepted                                                                                                                                                                                                                                                        |
+| Date        | 2026-10-01                                                                                                                                                                                                                                                      |
+| Amended     | 2026-10-03: the table's resource type, its guards against replacement, and UTC quota periods are recorded, and verification steps 1 and 4 are updated (S2-08); 2026-10-06: document and job IDs are lowercase UUID v7, and verification step 5 is added (S3-03) |
+| Deciders    | Project owner                                                                                                                                                                                                                                                   |
+| Sprint item | S1-13                                                                                                                                                                                                                                                           |
 
 ## Context
 
@@ -71,7 +71,7 @@ Rejected, because it fails driver 2. The managed knowledge base ([ADR-0007](0007
 - Every item has an `Entity` attribute that names its kind, so a scan or an export can be filtered by kind.
 - TTL is turned on for the `expiresAt` attribute. Only items that should expire carry it.
 - Quota days and months are UTC (QUOTA-02): `<date>` is `YYYY-MM-DD` and `<month>` is `YYYY-MM`.
-- Every key is built by one module, `apps/api/src/data/keys.ts`. It refuses a `sub` that isn't a lowercase UUID and an ID that contains anything other than letters, digits, `_`, and `-`, so a wrong value can't make a valid-looking key in the wrong partition.
+- Every key is built by one module, `apps/api/src/data/keys.ts`. It refuses a `sub` that isn't a lowercase UUID and an ID that isn't a lowercase UUID v7, so a wrong value can't make a valid-looking key in the wrong partition.
 
 | Item            | `PK`         | `SK`                  | `Entity`        | Notes                                             |
 | --------------- | ------------ | --------------------- | --------------- | ------------------------------------------------- |
@@ -81,6 +81,14 @@ Rejected, because it fails driver 2. The managed knowledge base ([ADR-0007](0007
 | Monthly counter | `USER#<sub>` | `QUOTA#MONTH#<month>` | `QuotaCounter`  | `expiresAt` after the UTC month ends              |
 | KB document     | `USER#<sub>` | `DOC#<id>`            | `KbDocument`    | Metadata only; the file is in S3                  |
 | Generation job  | `USER#<sub>` | `JOB#<id>`            | `GenerationJob` |                                                   |
+
+### IDs for documents and jobs
+
+- **Format:** UUID version 7 [5], lowercase, with hyphens, 36 characters, for example `019ab3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b`. `keys.ts` refuses every other shape, including UUID v4, ULIDs, and capital letters, so one item can't have two valid IDs.
+- **Generator:** Node's built-in `crypto.randomUUIDv7()`, added in Node 24.16.0 [4], so no dependency is needed. Only the API creates IDs, so only TypeScript needs a generator. `keys.ts` exports it as `newId()`. The Lambda Node 24 base image runs Node 24.21.0 (checked 2026-10-06).
+- **Why time-ordered:** the first 48 bits are the creation time in Unix milliseconds [5], written as fixed-width lowercase hex. DynamoDB sorts a string sort key by its bytes, so `DOC#` and `JOB#` keys sort by creation time. A query on `begins_with(SK, 'JOB#')` with `ScanIndexForward: false` lists a user's jobs newest first, with no index and no sort in code.
+- **Options rejected:** UUID v4 is built in but random, so listing newest first would need a sort in code or an index. A ULID is time-ordered but needs a dependency and has no standard library support.
+- **Limits:** the order is to the millisecond only. Node fills the bits after the timestamp at random, with no counter, so two IDs from the same millisecond are in random order. Order across Lambda instances depends on their clocks. An ID reveals when its item was created. That is acceptable because only the owner sees these IDs, and they see `createdAt` anyway. Public IDs (chatbot page, coupon) are decided with those features.
 
 ### Access
 
@@ -123,9 +131,12 @@ Rejected, because it fails driver 2. The managed knowledge base ([ADR-0007](0007
 2. A test for the quota counter shows that two concurrent updates that together pass the limit result in one success and one `ConditionalCheckFailedException`.
 3. A test for account deletion shows that every item under `USER#<sub>` is removed and items of other users are not.
 4. A daily counter item carries `expiresAt` set to the end of its UTC day.
+5. `keys.test.ts` shows that `newId()` makes an ID the keys accept, that the ID starts with its creation time, and that the keys refuse a UUID v4, a ULID, and capital letters.
 
 ## Sources
 
 1. Amazon DocumentDB pricing (Serverless DCU-hour rate and minimum capacity): <https://aws.amazon.com/documentdb/pricing/>, accessed 2026-10-01
 2. `AWS::DynamoDB::GlobalTable` (single-region billing, and converting from `AWS::DynamoDB::Table`): <https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-dynamodb-globaltable.html>, accessed 2026-10-03
 3. AWS CDK `aws-dynamodb` README, aws-cdk-lib 2.271.0: "`TableV2` is the preferred construct for all use cases, including creating a single table", read 2026-10-03
+4. Node.js v24 documentation, `crypto.randomUUIDv7([options])` ("added: v24.16.0"): <https://nodejs.org/docs/latest-v24.x/api/crypto.html#cryptorandomuuidv7options>, accessed 2026-10-06
+5. RFC 9562, Universally Unique IDentifiers (UUIDs), §5.7 UUID Version 7: <https://www.rfc-editor.org/rfc/rfc9562#section-5.7>, accessed 2026-10-06
