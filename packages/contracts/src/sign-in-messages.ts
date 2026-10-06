@@ -5,7 +5,7 @@
 // here: the trigger imports this file on its own (package.json "exports"), so its bundle stays small.
 export const PRE_SIGN_UP_MESSAGES = {
   googleNotTrusted:
-    'Google sign-in works only for Gmail addresses. Please sign up with your email address and a password', // case 6
+    'Google sign-in works only for Gmail and Google Workspace addresses. Please sign up with your email address and a password', // case 6
   useYourPassword:
     'An account with this email address already exists. Please sign in with your password', // cases 7 and 10
   failed: 'Sign-in failed. Please try again', // anything unexpected: fail closed

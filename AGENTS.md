@@ -56,11 +56,11 @@ Each requirement has an ID so sprint backlogs can refer to it.
 
 ### 4.1 Accounts and Authentication (AUTH)
 
-| ID      | Requirement                                                                                                                                                                                                                                                               |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| AUTH-01 | A candidate can register for free.                                                                                                                                                                                                                                        |
-| AUTH-02 | Sign-in uses Amazon Cognito with email/password and OAuth (Google at launch, LinkedIn planned). Sign-ins with the same verified email are linked to one account. At launch, Google sign-in accepts Gmail addresses ([ADR-0009](docs/adr/0009-sign-in-and-api-access.md)). |
-| AUTH-03 | Email verification is optional. A verified account gets a higher quota.                                                                                                                                                                                                   |
+| ID      | Requirement                                                                                                                                                                                                                                                                                    |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AUTH-01 | A candidate can register for free.                                                                                                                                                                                                                                                             |
+| AUTH-02 | Sign-in uses Amazon Cognito with email/password and OAuth (Google at launch, LinkedIn planned). Sign-ins with the same verified email are linked to one account. At launch, Google sign-in accepts Gmail and Google Workspace addresses ([ADR-0009](docs/adr/0009-sign-in-and-api-access.md)). |
+| AUTH-03 | Email verification is optional. A verified account gets a higher quota.                                                                                                                                                                                                                        |
 
 ### 4.2 Candidate Knowledge Base (KB)
 

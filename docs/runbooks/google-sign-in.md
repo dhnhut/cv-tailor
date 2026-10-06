@@ -149,14 +149,15 @@ The pool is case-insensitive, so Cognito writes these usernames in lowercase. Th
 
 The pre sign-up trigger links a person's first Google sign-in to the local user with the same address, or creates that user first. Each case is in ADR-0009 §2. Run these checks after the trigger first reaches an environment, and after any change to it.
 
-They use two addresses that you can receive email at:
+They use three addresses that you can receive email at:
 
-- **G**, a Gmail address with a Google account. It tests linking, because only Gmail addresses are linked.
-- **N**, an address that isn't Gmail, ideally also a Google account (for example a Google Workspace address). It tests that such an account is never linked (case 6).
+- **G**, a Gmail address with a Google account. It tests linking.
+- **W**, a Google Workspace address, such as a university or company account. It tests that a Workspace address in its own Workspace domain is linked like Gmail (S2-13).
+- **N**, an address that is neither Gmail nor Workspace, ideally also a Google account (a Google account created for an existing address at another provider). It tests that such an account is never linked (case 6).
 
 Run everything in one terminal, so the variables and helpers stay defined. "Browser" means: open the link from section 4.1, step 4, in a **new private window**, and sign in as the step says.
 
-If G is your own account, checks 4.3 to 4.7 delete it. That gives you a new `sub`, and removes you from the `admin` group. Section 4.10 restores both. A Gmail account used only for testing avoids this.
+If G is your own account, checks 4.3 to 4.7 delete it. That gives you a new `sub`, and removes you from the `admin` group. Section 4.11 restores both. A Gmail account used only for testing avoids this.
 
 ### 4.1 Set up
 
@@ -169,21 +170,22 @@ If G is your own account, checks 4.3 to 4.7 delete it. That gives you a new `sub
      --query LoggingConfig.LogGroup --output text); echo "$LOGS"
    ```
 
-2. Set the two addresses, and a password for the test sign-ups. Remember the password: some checks sign in with it.
+2. Set the three addresses, and a password for the test sign-ups. Remember the password: some checks sign in with it.
 
    ```bash
    read -r -p 'Gmail address (G): ' G
-   read -r -p 'Non-Gmail address (N): ' N
+   read -r -p 'Workspace address (W): ' W
+   read -r -p 'Neither Gmail nor Workspace (N): ' N
    read -rs -p 'Test password (8+ characters): ' PW; echo
    ```
 
-3. Define the helpers. `users` shows the users with an address, with their status, `sub`, and linked identities. `remove` deletes them. `signup` and `confirm` do a password sign-up the way the web app's form does, through the same `PreSignUp_SignUp` trigger as managed login.
+3. Define the helpers. `users` shows the users with an address, with their status, `sub`, Workspace domain (`custom:hd`), and linked identities. `remove` deletes them. `signup` and `confirm` do a password sign-up the way the web app's form does, through the same `PreSignUp_SignUp` trigger as managed login.
 
    ```bash
    users() {   # users <email>
      aws cognito-idp list-users --user-pool-id "$POOL" --profile "cvt-$ENV" \
        --filter "email = \"$1\"" \
-       --query 'Users[].{Status:UserStatus,Sub:Attributes[?Name==`sub`]|[0].Value,Identities:Attributes[?Name==`identities`]|[0].Value}' \
+       --query 'Users[].{Status:UserStatus,Sub:Attributes[?Name==`sub`]|[0].Value,Hd:Attributes[?Name==`custom:hd`]|[0].Value,Identities:Attributes[?Name==`identities`]|[0].Value}' \
        --output table
    }
    remove() {  # remove <email>: deletes every user with that address
@@ -213,10 +215,10 @@ If G is your own account, checks 4.3 to 4.7 delete it. That gives you a new `sub
 5. Check the starting point:
 
    ```bash
-   users "$G"; users "$N"
+   users "$G"; users "$W"; users "$N"
    ```
 
-   Expected: no `EXTERNAL_PROVIDER` row for either address. If there is one, delete it (section 3), because that Google account never reaches the trigger. If G has no row, run `signup "$G"` and `confirm "$G"` now, for check 4.2.
+   Expected: no `EXTERNAL_PROVIDER` row for any address. If there is one, delete it (section 3), because that Google account never reaches the trigger. If G has no row, run `signup "$G"` and `confirm "$G"` now, for check 4.2.
 
 ### 4.2 Cases 3 and 9: password first, Google later
 
@@ -302,7 +304,22 @@ remove "$G"; remove "$GC"
 
 Expected: Google is linked to the user that `signup` created, with the same `sub`. If the Google sign-in fails with "Sign-in failed. Please try again.", the trigger's lookup doesn't match the capitals. Record it, because it blocks that person's Google sign-in.
 
-### 4.8 Case 6: an address that isn't Gmail
+### 4.8 Cases 4 and 3 with a Workspace address
+
+```bash
+remove "$W"
+# Browser: sign in with Google as W.
+users "$W"   # note the sub (S4)
+# Browser: sign in with Google as W again.
+users "$W"
+aws logs filter-log-events --log-group-name "$LOGS" --profile "cvt-$ENV" \
+  --filter-pattern adrCase --query 'events[-2:].message' --output text
+remove "$W"
+```
+
+Expected: signed in both times. One `CONFIRMED` row with `sub` S4, `Hd` set to W's domain, and Google linked. The first sign-in's log line shows `"adrCase":4` and `"hd":"matches"`; the second sign-in never reaches the trigger (case 9). If the first shows `"hd":"differs"`, W is on a secondary or alias domain of its Workspace organization, which is refused (ADR-0009 §2); use an address in the primary domain.
+
+### 4.9 Case 6: an address that is neither Gmail nor Workspace
 
 ```bash
 # Browser: sign in with Google as N (skip if N isn't a Google account).
@@ -314,14 +331,14 @@ users "$N"
 remove "$N"
 ```
 
-Expected: both Google sign-ins show "Google sign-in works only for Gmail addresses. …". No user is created, and the password account keeps its `sub` with no `Identities`: an account that isn't Gmail is never linked.
+Expected: both Google sign-ins show "Google sign-in works only for Gmail and Google Workspace addresses. …". No user is created, and the password account keeps its `sub` with no `Identities`: an account Google doesn't vouch for is never linked. The log lines show `"adrCase":6` and `"hd":"absent"`.
 
-### 4.9 Timing and logs
+### 4.10 Timing and logs
 
 ```bash
 aws logs filter-log-events --log-group-name "$LOGS" --profile "cvt-$ENV" \
   --filter-pattern '?REPORT ?durationMs' --query 'events[].message' --output text
-for address in "$G" "$N"; do
+for address in "$G" "$W" "$N" "${W#*@}"; do
   aws logs filter-log-events --log-group-name "$LOGS" --profile "cvt-$ENV" \
     --filter-pattern "\"$address\"" --query 'events[].message'
 done
@@ -330,9 +347,9 @@ done
 Expected:
 
 - **Timing:** on each `REPORT` line, `Duration` plus any `Init Duration` is well under 5,000 ms, and so is the trigger's own `durationMs`. The slowest run is a case 4 on a cold start, which also runs the function a second time for `AdminCreateUser`. Record the numbers.
-- **Personal data:** both searches print `[]`. The trigger never logs an address.
+- **Personal data:** every search prints `[]`. The trigger never logs an address or a Workspace domain.
 
-### 4.10 Clean up
+### 4.11 Clean up
 
 1. If G is a test account, run `remove "$G"`.
 2. If G is your own account, sign in with Google as G once, which creates your user again (case 4). If you're an admin, add yourself back to the group ([users and admins](users-and-admins.md)):
@@ -360,7 +377,7 @@ Expected:
      --query 'IdentityProvider.{Type:ProviderType,ClientId:ProviderDetails.client_id,Scopes:ProviderDetails.authorize_scopes,Mapping:AttributeMapping}'
    ```
 
-   Expected: `Google`, the committed client ID, `openid email`, and a mapping with `email` and `email_verified`. Cognito adds `username: sub` to the mapping itself.
+   Expected: `Google`, the committed client ID, `openid email`, and a mapping with `email`, `email_verified`, and `custom:hd` (from Google's `hd`). Cognito adds `username: sub` to the mapping itself.
 
 2. The web client offers Google:
 
@@ -402,7 +419,7 @@ Expected:
 - **Google shows `Error 401: deleted_client`:** Google deletes clients that are unused for 6 months, and emails a warning 30 days before. Restore it from **Deleted credentials** within 30 days, or create a new client (steps 1.2 to 1.4).
 - **`email_verified` isn't `true`:** check the mapping ([Verify](#verify), step 1). Without the `email_verified` mapping, Cognito stores every Google email address as unverified.
 - **Where a refusal appears:** for a password sign-up, managed login shows the trigger's message above the form. For a Google sign-in, Cognito sends the browser to `https://<host>/auth/callback?error=invalid_request&error_description=PreSignUp+failed+with+error+<message>.`, and the web app shows the message (S2-10). The web app shows only the three messages below. Any other `error_description` gets "Sign-in didn't work. Please try again.", because anyone can send a link to the callback with their own text.
-- **"Google sign-in works only for Gmail addresses. …":** expected for a Google account whose address isn't a verified Gmail address, such as a Google Workspace address (ADR-0009 §2, case 6). The person signs up with their email address and a password.
+- **"Google sign-in works only for Gmail and Google Workspace addresses. …":** expected for a Google account whose address is neither a verified Gmail address nor an address in its own Workspace domain (ADR-0009 §2, case 6). The trigger's log line tells which: `"hd":"absent"` for an account outside Workspace, `"hd":"differs"` for a Workspace account on a secondary or alias domain. The person signs up with their email address and a password.
 - **"An account with this email address already exists. Please sign in with your password":** a local user has this address, but its email isn't verified (cases 7 and 10). Only an admin action creates such a user, because a self sign-up verifies its email with the emailed code. The person signs in with their password. To let them use Google instead, first check who the account belongs to, because linking gives Google's owner the account and its data. Then mark the email as verified, and their next Google sign-in links (case 3):
 
   ```bash
@@ -410,7 +427,7 @@ Expected:
     --username "$USERNAME" --user-attributes Name=email_verified,Value=true
   ```
 
-  `USERNAME` comes from `list-users`, as in section 4.10.
+  `USERNAME` comes from `list-users`, as in section 4.11.
 
 - **"Sign-in failed. Please try again":** the trigger hit something unexpected and changed nothing more. Look in its logs (section 4.1, step 1) for `"outcome":"error"`. The line has the Cognito error's name, never the address. If a retry succeeds, the first attempt was interrupted, and case 10 finished it.
 - **A Google sign-in creates a row with the status `EXTERNAL_PROVIDER`:** the trigger didn't run. Check that `describe-user-pool` shows `LambdaConfig.PreSignUp` (section 4.1, step 1), then delete the row (section 3).
