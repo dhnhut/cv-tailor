@@ -1,0 +1,225 @@
+# Sprint 3: Knowledge Base and First Agent
+
+**Sprint goal:** A candidate uploads documents to their own knowledge base at `dev.cv.ikiwii.com` and sees them indexed. They can also submit a job description as text and get a structured analysis back from the first agent, which runs on AgentCore Runtime behind the kill switch.
+
+**Dates:** 2026-10-08 to 2026-10-14
+
+**Status:** Planned
+
+## Scope
+
+- The decisions Sprint 3 needs, made first: the async generation mechanism (D-07), the ID format for documents and jobs (D-13), the model per task (D-09), and the evaluation benchmark design (D-10)
+- The knowledge base: a documents bucket, the managed knowledge base with ACLs ([ADR-0007](../adr/0007-knowledge-base-store.md)), presigned upload, the 50 MB storage cap, ingestion sync, document status, and a page to manage documents (KB-01, KB-03, KB-04, KB-05, KB-06)
+- The agent service on AgentCore Runtime, deployed by CI
+- A first JD Analyzer on a JD given as text, run end to end as an async job: API, AgentCore, job status, and a web page (GEN-01 text, GEN-04, SAFE-01)
+- The API's own kill switch check, on the first endpoint that starts AI work (S2-11)
+
+This is slice C of [ADR-0005](../adr/0005-mvp-scope.md), plus the first agent from slice D. A candidate creates Markdown content (KB-01) by uploading `.md` files. An in-app editor is not planned.
+
+---
+
+## Target Picture
+
+```text
+Browser (dev.cv.ikiwii.com)
+├─ /documents ── POST /documents ──▶ API Lambda ──▶ DynamoDB (KbDocument, storage reservation)
+│     │                                  └─ writes the ACL file (<file>.metadata.json) to S3
+│     └─ presigned upload ────────────────────────▶ S3 documents bucket
+│                                                   └─ event ─▶ sync Lambda ─▶ StartIngestionJob
+│                                                                               └─▶ managed knowledge base
+└─ /analyze   ── POST /jobs ──▶ API Lambda (admin only, kill switch) ──▶ GenerationJob: QUEUED
+                                   └─ ADR-0010 mechanism ─▶ AgentCore Runtime: JD Analyzer
+                                                              ├─▶ Bedrock Converse (AI call guard)
+                                                              └─▶ GenerationJob: DONE + result
+              ── GET /jobs/{id} (poll) ◀──────────────────────────┘
+```
+
+| Stage            | Deployed by | Holds after this sprint                                                                                                                                                                          |
+| ---------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `<env>-access`   | Laptop      | Unchanged                                                                                                                                                                                        |
+| `<env>-baseline` | Laptop      | Unchanged (the kill switch parameter exists since S2-11)                                                                                                                                         |
+| `<env>-dns`      | Laptop      | Unchanged                                                                                                                                                                                        |
+| `<env>`          | CI          | Adds the knowledge base stack (bucket, knowledge base, data source, sync Lambda), the agents stack (AgentCore Runtime and its role), and new API routes. Stack names are set in S3-06 and S3-10. |
+
+---
+
+## Backlog
+
+| ID    | Item                                  | Requirement IDs            | Acceptance criteria                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ----- | ------------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| S3-01 | Sprint doc                            | —                          | This doc is merged.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| S3-02 | ADR-0010: async generation            | GEN-04                     | `docs/adr/0010-async-generation.md` settles every point in [S3-02 details](#s3-02-details-what-adr-0010-settles), with sources for any AgentCore behaviour it relies on. Status is "Accepted" by day 2 of the sprint. `AGENTS.md` §7 is updated.                                                                                                                                                                                                                                                                                                                                           |
+| S3-03 | ID format for documents and jobs      | §7                         | ADR-0006 is amended with one ID format for knowledge base documents and generation jobs, and the reason. The `ID` pattern in `apps/api/src/data/keys.ts` accepts only that format, and its tests cover a valid ID and the shapes it now refuses.                                                                                                                                                                                                                                                                                                                                           |
+| S3-04 | ADR-0011: model per task              | QUOTA-01                   | `docs/adr/0011-model-per-task.md` splits the USD 0.10 per generation budget across the agents in `AGENTS.md` §5.3, using current Bedrock prices with sources. It chooses the JD Analyzer's model from S3-11's measured cost and benchmark scores, and gives provisional models for the other agents, which Sprint 4 confirms. It records how prompt caching is used. Status is "Accepted" before S3-11 closes.                                                                                                                                                                             |
+| S3-05 | ADR-0012: evaluation benchmark design | SAFE-03                    | `docs/adr/0012-evaluation-benchmark.md` settles every point in [S3-05 details](#s3-05-details-what-adr-0012-settles). Status is "Accepted" before S3-11 closes. `services/agents/evals/README.md` describes the dataset format and how to run the benchmark.                                                                                                                                                                                                                                                                                                                               |
+| S3-06 | Knowledge base stack                  | KB-05                      | The workload stage has a knowledge base stack: a private documents bucket, the managed knowledge base, and an S3 data source with ACLs on, a 50 MB file size filter, and a recorded decision on image extraction. The bucket holds user data, so it has the same guards against replacement and deletion as the data table (S2-08). The knowledge base ID, data source ID, and bucket name are in SSM. A test pins `connectorParameters`. `infra/spikes/`, its test, and `kb_spike_check.py` are deleted.                                                                                  |
+| S3-07 | Document API                          | KB-01, KB-03, KB-04, KB-06 | `POST /documents`, `GET /documents`, and `DELETE /documents/{id}` work as [S3-07 details](#s3-07-details-upload-and-delete) describe. The API writes each document's ACL file, never the browser. The 50 MB total holds under concurrent uploads. An upload whose content hash matches the stored one is skipped. Contracts are in `packages/contracts`. The Lambda's IAM policy allows only the actions it uses, which an exact-match test checks. Tests cover: user A can't list or delete user B's documents, a wrong type or size is refused, and the cap refuses one byte over 50 MB. |
+| S3-08 | Ingestion sync and document status    | KB-05                      | An upload or a delete starts an ingestion sync, and two syncs that collide are handled, as [S3-08 details](#s3-08-details-sync-and-status) describe. `GET /documents` shows each document's status (`PENDING`, `INDEXED`, or `FAILED`). A CloudWatch alarm fires when an ingestion job reports failed documents. Checked live: an uploaded file reaches `INDEXED`, and a deleted one leaves the knowledge base.                                                                                                                                                                            |
+| S3-09 | Knowledge base page                   | KB-01, KB-03               | A signed-in candidate uploads, lists, and deletes documents on a `/documents` page, and sees each document's status and their usage against 50 MB. Type and size are checked before upload. Tests cover each state. Checked live on `dev.cv.ikiwii.com` with a `.md` and a `.pdf` file.                                                                                                                                                                                                                                                                                                    |
+| S3-10 | Agents on AgentCore Runtime           | ADMIN-03, KB-05            | CI deploys `services/agents` to an AgentCore Runtime in `dev`, built before AWS credentials exist. The runtime role allows only the actions in [S3-10 details](#s3-10-details-the-agent-runtime), which an exact-match test checks. `clients.py` gains a Retrieve client behind the kill switch, and one function builds the ACL identity from the `sub`. Checked live: the runtime answers a health request, and a Retrieve for user A never returns user B's document.                                                                                                                   |
+| S3-11 | JD Analyzer                           | GEN-01, SAFE-01, SAFE-04   | A LangGraph agent turns a JD given as text into a `JdAnalysis`, a contract in `packages/contracts` with a generated Pydantic model (ADR-0003). Every model call goes through the AI call guard, and the boundary test still passes. The JD is handled as untrusted data, and tests include JDs with hidden instructions. Log lines hold no JD text. The JD Analyzer benchmark from ADR-0012 passes its thresholds, and the scores and cost per call are recorded in the sprint review.                                                                                                     |
+| S3-12 | Generation job API                    | GEN-01, GEN-04, ADMIN-03   | `POST /jobs`, `GET /jobs/{id}`, and `GET /jobs` work as [S3-12 details](#s3-12-details-the-job-api) describe. `POST /jobs` checks the kill switch itself before it starts any work, and only the `admin` group may call it until the quota exists (Sprint 6). Tests cover the kill switch states, a non-admin caller, a JD that is too long, and user A reading user B's job. Checked live: a job returns a result, a disabled switch returns `503` within 30 seconds, and a non-admin gets `403`.                                                                                         |
+| S3-13 | JD analysis page                      | GEN-01                     | A signed-in admin pastes a JD on an `/analyze` page, submits it, and sees the analysis when the job finishes. The page shows clear states for "AI is paused", "not allowed", failed, and timed out. Tests cover each state. Checked live end to end on `dev.cv.ikiwii.com`.                                                                                                                                                                                                                                                                                                                |
+| S3-14 | Close the sprint                      | DoD                        | The sprint review is filled in, and every backlog ID has a "Done" or "Not done" entry.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+
+### S3-02 details: what ADR-0010 settles
+
+1. **The mechanism.** Options to compare:
+   - (a) The API calls `InvokeAgentRuntime`, and the agent answers at once and continues the job in the background, using AgentCore Runtime's support for long-running work.
+   - (b) The API sends an SQS message, and a worker Lambda calls the runtime and waits. Lambda's 15-minute limit then bounds a job.
+   - (c) A Step Functions state machine runs the job and calls the runtime.
+2. **How results reach the web app:** polling `GET /jobs/{id}`, a WebSocket, or streaming, and the cost of each.
+3. **Who writes the job item.** ADR-0006 says one module, in TypeScript, builds every key. The ADR chooses between a Python writer in the agent, kept identical to the TypeScript keys by a shared test or contract, and returning the result to a TypeScript writer.
+4. **Job states** (`QUEUED`, `RUNNING`, `DONE`, `FAILED`), the longest a job may run, how a stuck job becomes `FAILED`, and whether finished jobs expire through TTL.
+5. **Retries and idempotency:** a retried start never runs the agent twice.
+6. **How the API calls the runtime and is authorised,** and the session ID for each job.
+7. **Cost** at low volume: fixed and per job.
+
+### S3-03 details: the ID format
+
+- The current leaning is a time-ordered ID (UUID v7 or ULID): with `SK = JOB#<id>`, a query with `ScanIndexForward: false` lists a user's jobs newest first, with no index.
+- Check whether Node 24 can generate a UUID v7 without a dependency before adding one.
+- Only the API creates IDs, so only TypeScript needs a generator.
+
+### S3-05 details: what ADR-0012 settles
+
+1. **Dataset:** synthetic candidates and JDs only, never real personal data. Where it lives (`services/agents/evals/`) and its versioned format.
+2. **Metrics for each agent.** JD Analyzer: requirement recall and precision against hand-labelled JDs, schema validity, and cost and latency per call. Writers and Reviewer (Sprint 4): fabrication rate (every claim traces back to a source document), JD coverage, and style match.
+3. **Pass thresholds** for each metric.
+4. **The runner:** our own runner, or AgentCore Evaluations, compared on cost, effort, and where results are kept.
+5. **When it runs:** on demand in Sprint 3, and as a CI gate from Sprint 4, with a cost cap for each run.
+
+### S3-06 details: the knowledge base stack
+
+- It reuses the spike's knowledge base, data source, and service role (`infra/spikes/kb-spike-stack.ts`), with these changes from the S2-12 review notes:
+  - the data source sets `filterConfiguration.maxFileSizeInMegaBytes` to `"50"`;
+  - image extraction is turned off, unless the item finds a reason to keep it. Images aren't an allowed upload type, and the service turns it on by default.
+- **Bucket:** private, encrypted, SSL only. CORS allows uploads from `https://<host>` only. It has a retain policy and a fixed name, and its stack has termination protection.
+- The API and the runtime read the IDs from SSM, as other stacks read the user pool ID.
+
+### S3-07 details: upload and delete
+
+1. `POST /documents` with `{ name, type, size, sha256 }`:
+   - checks the type (`.txt`, `.md`, `.html`, `.doc`, `.docx`, `.pdf`) and the size (50 MB at most);
+   - skips the upload when the same hash is already stored for this user, because overwriting an unchanged file re-indexes it (S2-12);
+   - reserves the bytes against the 50 MB total with a conditional update, so two uploads at once can't pass the cap;
+   - creates the `KbDocument` item, writes the ACL file for `<sub>@users.cv-tailor.invalid`, and returns a presigned upload.
+2. The item chooses a presigned POST, whose policy fixes the key and the size range, or a presigned PUT with a signed length and checksum, and records why.
+3. A reservation whose upload never arrives is released. The item chooses how.
+4. `GET /documents` lists the caller's documents and their status (S3-08).
+5. `DELETE /documents/{id}` removes the document, its ACL file, and its item, frees its bytes, and starts a sync.
+6. The ACL identity is built by one function. S3-10's Python function must build the same string, which a test checks.
+7. The Vite dev server gets a proxy entry for each new path (S2-10).
+
+### S3-08 details: sync and status
+
+- An S3 event for a document, not its ACL file, triggers a small Lambda that starts an ingestion job.
+- Before choosing how to handle collisions, the item checks AWS's limits on concurrent ingestion jobs per data source and per knowledge base. A collision is retried with backoff, or events are batched through SQS. The item records the choice.
+- Status comes from `ListKnowledgeBaseDocuments`, mapped from `s3://<bucket>/<key>` back to the document ID (S2-12).
+- The alarm reads each ingestion job's failed-document count. It is a signal only: ingestion doesn't name a document it drops (S2-12).
+
+### S3-10 details: the agent runtime
+
+- **Packaging:** container image or direct code deploy. The item compares them and records the choice. Either way, the build runs before AWS credentials in `deploy.yml`, as the web app and API builds do. Direct code deploy is preferred if it supports the package's dependencies, because CI then needs no Docker.
+- **Runtime role**, from the S2-11 and S2-12 review notes:
+  - `ssm:GetParameter` on `/cv-tailor/ai-calls`;
+  - model invocation for ADR-0011's models only;
+  - `bedrock:Retrieve` on the knowledge base;
+  - only the table actions ADR-0010 needs.
+- **Retrieve client:** `clients.py` gains a `bedrock-agent-runtime` client. Its guard allows only `Retrieve`, refuses a call without `userContext`, and checks the kill switch. The boundary test covers the new service.
+- **Observability:** logs and traces are on, with a set log retention.
+
+### S3-12 details: the job API
+
+1. `POST /jobs` with `{ jd }`:
+   - refuses a caller outside the `admin` group with `403`;
+   - refuses a JD longer than a set limit, which leaves room for the prompt within the guard's 100,000-byte input cap;
+   - checks the kill switch, and returns `503` with a stable "AI is paused" code when it is off;
+   - creates the `GenerationJob` item (`QUEUED`), starts the work as ADR-0010 decides, and returns `202` with the job ID.
+2. `GET /jobs/{id}` returns the status and, when the job is `DONE`, its `JdAnalysis`. Another user's job returns `404`.
+3. `GET /jobs` lists the caller's jobs, newest first.
+4. **The kill switch check** follows the S2-11 rules: only `enabled` allows work; a missing parameter or a read error blocks it and isn't cached; a good value is cached for 30 seconds. An infra test checks that the API and the guard name the same parameter.
+5. **Why the API checks the switch** when the guard already checks every model call:
+   - Without it, a job is written and the runtime is invoked, and AgentCore bills for its active time, before the guard refuses the first model call. ADMIN-03 turns off all AI calls, and invoking the runtime is one.
+   - The candidate sees "AI is paused" at once, not a job that fails a few polls later.
+   - Two independent checks: a bug in one still leaves the other. The guard remains the final check, and it also stops jobs already running when the switch turns off.
+
+---
+
+## Execution Guide (step by step)
+
+See the owner legend in [README.md](README.md#owner-legend). Every step follows the [git flow](README.md#git-flow).
+
+| #   | Step                    | Item  | Owner                          | How                                                                                                                              | Verify                                                                                                                                                                                     |
+| --- | ----------------------- | ----- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | Save the sprint doc     | S3-01 | Claude                         | Write this file.                                                                                                                 | I read and approve it.                                                                                                                                                                     |
+| 2   | Decide the async design | S3-02 | Claude drafts, **Me** decides  | Claude drafts ADR-0010 with the options in the S3-02 details, checked against the current AgentCore documentation.               | ADR status is "Accepted" by day 2.                                                                                                                                                         |
+| 3   | Decide the ID format    | S3-03 | Claude drafts, **Me** decides  | Claude checks Node 24's UUID support, proposes the format, and gives the ADR-0006 amendment and the `keys.ts` change with tests. | `pnpm --filter @cv-tailor/api test` passes.                                                                                                                                                |
+| 4   | Knowledge base stack    | S3-06 | Me + Claude                    | Claude gives the stack, its test, and the removal of the spike files. It runs in parallel with steps 2 and 3.                    | After the merge, the `main` run is green. `aws bedrock-agent get-data-source --profile cvt-dev …` shows ACLs on and the 50 MB filter.                                                      |
+| 5   | Document API            | S3-07 | Me + Claude                    | Claude gives the handlers, contracts, IAM policy, routes, and tests.                                                             | `curl` with an admin token uploads a file. The document and its ACL file are in S3. The same file again returns "unchanged".                                                               |
+| 6   | Sync and status         | S3-08 | Me + Claude                    | Claude gives the sync Lambda, the status mapping, the alarm, and tests.                                                          | The uploaded file shows `INDEXED` in `GET /documents`. After a delete, `list-knowledge-base-documents` no longer lists it.                                                                 |
+| 7   | Knowledge base page     | S3-09 | Me + Claude                    | Claude gives the page, the content security policy change, and tests.                                                            | On `dev.cv.ikiwii.com`, I upload a `.md` and a `.pdf`, see both indexed, delete one, and see my usage drop.                                                                                |
+| 8   | Model per task          | S3-04 | Claude drafts, **Me** decides  | Claude drafts ADR-0011 with current prices. The JD Analyzer's choice is filled in from step 10's numbers.                        | ADR status is "Accepted".                                                                                                                                                                  |
+| 9   | Evaluation benchmark    | S3-05 | Claude drafts, **Me** decides  | Claude drafts ADR-0012 and the dataset format. I review the labelled JDs.                                                        | ADR status is "Accepted".                                                                                                                                                                  |
+| 10  | Agent runtime           | S3-10 | Me + Claude                    | Claude gives the agents stack, the packaging step in `deploy.yml`, the Retrieve client, and tests. It starts after step 2.       | A check script gets a health answer from the runtime. A Retrieve as user A returns only A's documents.                                                                                     |
+| 11  | JD Analyzer             | S3-11 | Me + Claude                    | Claude gives the contract, the agent, its tests, and the benchmark runner. I run the benchmark.                                  | Tests pass. The benchmark meets ADR-0012's thresholds. A call through the runtime returns a valid `JdAnalysis`.                                                                            |
+| 12  | Job API                 | S3-12 | Me + Claude                    | Claude gives the handlers, the TypeScript kill switch check, contracts, IAM policy, routes, and tests.                           | `POST /jobs` returns `202`, and `GET /jobs/{id}` later shows `DONE` with a result. With the switch `disabled`, `POST /jobs` returns `503` within 30 seconds. A non-admin token gets `403`. |
+| 13  | JD analysis page        | S3-13 | Me + Claude                    | Claude gives the page and tests.                                                                                                 | On `dev.cv.ikiwii.com`, I paste a JD and see the analysis. With the switch off, I see "AI is paused".                                                                                      |
+| 14  | Close the sprint        | DoD   | Claude drafts, **Me** approves | Fill in the sprint review, and list any backlog ID without a "Done" or "Not done" entry.                                         | The sprint review below is complete.                                                                                                                                                       |
+
+Steps 2, 3, and 4 run in parallel on day 1. Steps 5 to 7 (the knowledge base) run while steps 8 and 9 are drafted. Step 10 starts as soon as ADR-0010 is accepted.
+
+---
+
+## Out of Scope (current sprint)
+
+- The Profile Matcher, the writers, the Style Agent, the Reviewer, and Bedrock Guardrails (Sprints 4 and 5)
+- The evaluation benchmark as a CI gate (Sprint 4)
+- Quota counters and checks (Sprint 6). Until then, AI and upload endpoints are for the `admin` group only.
+- An in-app Markdown editor. Markdown content is uploaded as `.md` files.
+- A JD from a link or a file (Sprint 5)
+- Workloads in `stag` and `prod`
+- AgentCore Memory, Gateway, Policy, and Browser
+- Deleting a candidate's knowledge base data when their account is deleted. It belongs to the account deletion item, which isn't planned yet.
+
+## Risks
+
+| Risk                                                                                                                                                           | Mitigation                                                                                                                                 |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Anyone can sign up in `dev`, and the quota comes in Sprint 6, so a script could call `POST /jobs` or upload files in a loop. The budget alarm isn't real time. | `POST /jobs` and `POST /documents` accept the `admin` group only until the quota exists. The API already knows the caller's group (S2-09). |
+| ADR-0010 is decided late, which blocks steps 10 to 13.                                                                                                         | It is due by day 2. The knowledge base steps run meanwhile.                                                                                |
+| Packaging and deploying to AgentCore Runtime from CI is new.                                                                                                   | Step 10 starts right after ADR-0010. Direct code deploy is preferred, so CI needs no Docker.                                               |
+| Ingestion jobs collide, or a sync is slow.                                                                                                                     | S3-08 handles collisions, and the page shows each document's status.                                                                       |
+| `infra/test/bin.test.ts` times out more often with two more stacks (S2-13 lesson).                                                                             | If it fails in CI, it gets its own step.                                                                                                   |
+| The sprint runs over: 14 items, as in Sprint 2.                                                                                                                | S3-09 moves first. The document API is checked with `curl`, and Sprint 4 needs knowledge base data, not the page.                          |
+| New costs.                                                                                                                                                     | Knowledge base storage, Retrieve calls, runtime active time, and model calls are all pay per use. Each item notes any fixed cost.          |
+
+## Definition of Done (Sprint 3)
+
+- All S3 items are merged to `main` through PRs with green CI.
+- After every merge, `gh run list --branch main --limit 1` shows the `main` run green, including `deploy-dev`.
+- An item that connects two systems (upload and sync, API and runtime, page and API) closes only after a real run on `dev.cv.ikiwii.com` succeeds.
+- Each item's PR adds its "Done" entry to the sprint review.
+- ADR-0010, ADR-0011, and ADR-0012 are accepted, ADR-0006 is amended, and `AGENTS.md` is updated.
+- The sprint review is filled in.
+
+## Verification
+
+1. A `.md` and a `.pdf` uploaded on `dev.cv.ikiwii.com` reach `INDEXED`.
+2. User A can't list, delete, or retrieve user B's documents.
+3. An upload that would pass 50 MB in total is refused.
+4. On `/analyze`, a pasted JD returns a structured analysis.
+5. With `/cv-tailor/ai-calls` set to `disabled`, `POST /jobs` returns `503` within 30 seconds, and the agent's guard refuses model calls.
+6. A user outside the `admin` group gets `403` from `POST /jobs` and `POST /documents`.
+7. The JD Analyzer benchmark meets ADR-0012's thresholds, and its cost per call is recorded.
+8. ADR-0010, ADR-0011, and ADR-0012 are accepted, and ADR-0006 records the ID format.
+
+---
+
+## Sprint Review
+
+- **Done:**
+- **Not done / carried over:**
+- **What changed and why:**
+- **Lessons learned:**
+- **Next sprint backlog:**
