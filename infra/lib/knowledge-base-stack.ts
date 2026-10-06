@@ -125,7 +125,7 @@ export class KnowledgeBaseStack extends Stack {
     knowledgeBase.node.addDependency(role);
 
     // No vectorIngestionConfiguration: the default chunking can't be changed after creation, so a
-    // change means a new data source (S3-06 decision 8).
+    // change means a new data source (ADR-0007).
     const dataSource = new CfnDataSource(this, 'DataSource', {
       knowledgeBaseId: knowledgeBase.attrKnowledgeBaseId,
       name: 'documents',
