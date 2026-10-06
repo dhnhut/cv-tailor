@@ -55,7 +55,8 @@ export function linkedGoogleSubs(identities: string | undefined): string[] {
 
 export const cognitoDirectory = (client: CognitoSend): UserDirectory => ({
   async findLocalUsers(poolId, email) {
-    // rules.ts accepts only a strict Gmail pattern, so the address can't break out of the quotes.
+    // rules.ts accepts no `"`, `\`, whitespace, or control characters, and at most 246 characters,
+    // so the address stays inside the quotes and the filter stays within 256 characters.
     const { Users = [] } = await client.send(
       new ListUsersCommand({ UserPoolId: poolId, Filter: `email = "${email}"` }),
     );

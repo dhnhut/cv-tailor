@@ -71,15 +71,90 @@ describe('readGoogleIdentity', () => {
     ).toEqual({ sub: GOOGLE_SUB, email: 'alice.smith@gmail.com' });
   });
 
-  // Case 6: Google vouches only for Gmail addresses that it has verified.
+  // S2-13: Google also vouches for a Workspace address in the account's own domain (hd).
+  test('accepts a verified Workspace address whose domain equals hd', () => {
+    expect(
+      readGoogleIdentity(`google_${GOOGLE_SUB}`, {
+        email: 'bob@uni.ac.nz',
+        email_verified: 'true',
+        'custom:hd': 'uni.ac.nz',
+      }),
+    ).toEqual({ sub: GOOGLE_SUB, email: 'bob@uni.ac.nz' });
+  });
+
+  test('lowercases a Workspace address, and compares hd without case', () => {
+    expect(
+      readGoogleIdentity(`google_${GOOGLE_SUB}`, {
+        email: 'Bob.Smith@Uni.AC.nz',
+        email_verified: 'true',
+        'custom:hd': 'UNI.ac.nz',
+      }),
+    ).toEqual({ sub: GOOGLE_SUB, email: 'bob.smith@uni.ac.nz' });
+  });
+
+  // Trust comes from the domain, so the username may hold any character Google allows, apart
+  // from those that could break the ListUsers filter.
+  test.each([
+    "o'brien",
+    'bob-smith',
+    'bob_smith',
+    'b.smith',
+    'bob+cv',
+    'o&brien',
+    'a=b',
+    'hi!',
+    'josé',
+  ])('accepts a Workspace username with the characters Google allows: %s', (username) => {
+    expect(
+      readGoogleIdentity(`google_${GOOGLE_SUB}`, {
+        email: `${username}@uni.ac.nz`,
+        email_verified: 'true',
+        'custom:hd': 'uni.ac.nz',
+      }),
+    ).toEqual({ sub: GOOGLE_SUB, email: `${username}@uni.ac.nz` });
+  });
+
+  test('accepts a Gmail address of 246 characters, the most the ListUsers filter fits', () => {
+    const email = `${'a'.repeat(236)}@gmail.com`;
+    expect(email).toHaveLength(246);
+    expect(readGoogleIdentity(`google_${GOOGLE_SUB}`, { email, email_verified: 'true' })).toEqual({
+      sub: GOOGLE_SUB,
+      email,
+    });
+  });
+
+  // Case 6: Google vouches only for Gmail and Workspace addresses that it has verified.
+  const workspace = (email: string, hd = 'uni.ac.nz', verified = 'true') => ({
+    email,
+    email_verified: verified,
+    'custom:hd': hd,
+  });
   test.each([
     ['unverified', { email: 'alice@gmail.com', email_verified: 'false' }],
     ['verification missing', { email: 'alice@gmail.com' }],
     ['verification not exactly "true"', { email: 'alice@gmail.com', email_verified: 'yes' }],
-    ['non-Gmail address', { email: 'alice@company.com', email_verified: 'true' }],
+    ['non-Gmail address with no hd', { email: 'alice@company.com', email_verified: 'true' }],
+    ['Workspace address with an empty hd', workspace('bob@uni.ac.nz', '')],
+    ['Workspace address in another domain than hd', workspace('bob@other.com')],
+    ['Workspace address in a subdomain of hd', workspace('bob@mail.uni.ac.nz')],
+    ['Workspace address in a parent domain of hd', workspace('bob@ac.nz')],
+    ['unverified Workspace address', workspace('bob@uni.ac.nz', 'uni.ac.nz', 'false')],
+    ['quote in a Workspace address', workspace('b"ob@uni.ac.nz')],
+    ['backslash in a Workspace address', workspace('b\\ob@uni.ac.nz')],
+    ['space in a Workspace address', workspace('b ob@uni.ac.nz')],
+    ['tab in a Workspace address', workspace('b\tob@uni.ac.nz')],
+    ['newline in a Workspace address', workspace('b\nob@uni.ac.nz')],
+    ['control character in a Workspace address', workspace('b\u0000ob@uni.ac.nz')],
+    ['two @ in a Workspace address', workspace('a@b@uni.ac.nz')],
+    ['empty username', workspace('@uni.ac.nz')],
+    ['Workspace domain without a dot', workspace('bob@localhost', 'localhost')],
     ['googlemail.com address', { email: 'alice@googlemail.com', email_verified: 'true' }],
     ['subdomain of gmail.com', { email: 'alice@mail.gmail.com', email_verified: 'true' }],
-    ['plus address', { email: 'alice+cv@gmail.com', email_verified: 'true' }],
+    // ListUsers takes a filter of at most 256 characters, and `email = ""` uses 10.
+    [
+      'address of 247 characters',
+      { email: `${'a'.repeat(237)}@gmail.com`, email_verified: 'true' },
+    ],
     [
       'quote that would break the ListUsers filter',
       { email: 'a"b@gmail.com', email_verified: 'true' },

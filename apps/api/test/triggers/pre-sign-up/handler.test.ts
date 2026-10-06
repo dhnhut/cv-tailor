@@ -204,6 +204,36 @@ describe('first Google sign-in', () => {
     });
   });
 
+  // S2-13: a Workspace address follows the same cases as Gmail once Google vouches for it.
+  test('case 4 with a Workspace address: creates a linked local user, and logs no domain', async () => {
+    const pool = fakePool();
+    await createHandler(pool.directory)(
+      googleSignIn({ email: 'Bob@Uni.ac.nz', email_verified: 'true', 'custom:hd': 'uni.ac.nz' }),
+    );
+    expect(pool.calls).toEqual([
+      'findLocalUsers',
+      'createUser',
+      'setRandomPassword new-user-1',
+      'linkGoogle new-user-1',
+    ]);
+    expect(pool.users.get('new-user-1')).toEqual({
+      email: 'bob@uni.ac.nz',
+      status: 'CONFIRMED',
+      emailVerified: true,
+      linkedGoogleSubs: [GOOGLE_SUB],
+    });
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({ adrCase: 4, hd: 'matches' });
+    expect(logged()).not.toContain('uni.ac.nz');
+  });
+
+  test('case 3 with a Workspace address: links Google to the existing local user', async () => {
+    const pool = fakePool({ 'local-1': user({ email: 'bob@uni.ac.nz' }) });
+    await createHandler(pool.directory)(
+      googleSignIn({ email: 'bob@uni.ac.nz', email_verified: 'true', 'custom:hd': 'uni.ac.nz' }),
+    );
+    expect(pool.calls).toEqual(['findLocalUsers', 'linkGoogle local-1']);
+  });
+
   test('case 5, takeover: deletes the unconfirmed user and never links it', async () => {
     const pool = fakePool({
       'attacker-1': user({ status: 'UNCONFIRMED', emailVerified: false }),
@@ -364,16 +394,17 @@ describe('errors and logs', () => {
     expect(logged()).not.toContain('bob@company.com');
   });
 
-  // The S2-13 spike reads this field to see whether Cognito passes Google's hd claim through.
-  test('a refused Workspace sign-in logs whether hd matched, but not the domain', async () => {
+  // The hd status explains a case 6 refusal without the domain, which names an organization.
+  test('a refused Workspace sign-in logs that hd differs, but not the domain', async () => {
     const pool = fakePool();
     await expect(
       createHandler(pool.directory)(
-        googleSignIn({ email: 'bob@uni.ac.nz', email_verified: 'true', 'custom:hd': 'uni.ac.nz' }),
+        googleSignIn({ email: 'bob@other.com', email_verified: 'true', 'custom:hd': 'uni.ac.nz' }),
       ),
     ).rejects.toThrow(PRE_SIGN_UP_MESSAGES.googleNotTrusted);
-    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({ adrCase: 6, hd: 'matches' });
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({ adrCase: 6, hd: 'differs' });
     expect(logged()).not.toContain('uni.ac.nz');
+    expect(logged()).not.toContain('other.com');
   });
 
   test('a sign-up that is not a Google sign-in logs no hd field', async () => {

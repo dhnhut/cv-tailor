@@ -5,9 +5,14 @@ import { PRE_SIGN_UP_MESSAGES } from '@cv-tailor/contracts/sign-in-messages';
 // The identity provider's name in the user pool. Cognito compares it case-sensitively.
 export const GOOGLE_PROVIDER = 'Google';
 
-// Gmail usernames are letters, digits, and dots. Only Gmail addresses are trusted at launch
-// (ADR-0009 §2). The strict pattern also keeps the address safe inside a ListUsers filter string.
-const GMAIL = /^[a-z0-9.]+@gmail\.com$/;
+// Google vouches only for Gmail and Workspace addresses (ADR-0009 §2), so trust comes from the
+// domain: gmail.com, or the account's own Workspace domain (hd). The username may hold any
+// character Google allows, except `"`, `\`, whitespace, and control characters, which could break
+// out of the quotes in the ListUsers filter (cognito.ts). One @ only.
+const ADDRESS = /^[^\s"\\@\p{Cc}]+@([a-z0-9-]+(?:\.[a-z0-9-]+)+)$/u;
+const GMAIL_DOMAIN = 'gmail.com';
+// ListUsers takes a filter of at most 256 characters, and `email = ""` uses 10 of them.
+const MAX_EMAIL_LENGTH = 246;
 
 // Google's hd claim, mapped to this attribute (S2-13). Google sends it only for Workspace (and Cloud
 // Identity) accounts. It holds the domain of the account's organization.
@@ -82,9 +87,13 @@ export function readGoogleIdentity(
     return refuse('other', PRE_SIGN_UP_MESSAGES.failed);
   }
 
-  // Case 6: Google vouches only for Gmail addresses that it has verified.
+  // Case 6: Google vouches only for addresses it has verified: Gmail addresses, and Workspace
+  // addresses whose domain is the account's own Workspace domain (hd).
   const email = (attributes.email ?? '').toLowerCase();
-  if (attributes.email_verified !== 'true' || !GMAIL.test(email)) {
+  const domain = email.length <= MAX_EMAIL_LENGTH ? ADDRESS.exec(email)?.[1] : undefined;
+  const trusted =
+    domain === GMAIL_DOMAIN || (domain !== undefined && hdStatus(attributes) === 'matches');
+  if (attributes.email_verified !== 'true' || !trusted) {
     return refuse(6, PRE_SIGN_UP_MESSAGES.googleNotTrusted);
   }
   return { sub, email };
