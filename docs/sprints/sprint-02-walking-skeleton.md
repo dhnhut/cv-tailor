@@ -294,7 +294,7 @@ Steps 8, 11, and 12 need only the repo and the `dev` account, so they can run wh
   - S2-13: `infra/test/bin.test.ts` hit its 2-minute timeout once more under the parallel `pnpm run check`, while the infra suite took 175 seconds instead of about 30; a rerun passed. If it fails in CI, it needs its own step or a longer limit.
 - **Next sprint backlog:**
 
-  Sprint 3 draft, from [ADR-0005](../adr/0005-mvp-scope.md) (slice C, plus a first JD Analyzer behind the kill switch) and the "for Sprint 3" notes above. The final backlog is set in S3-01.
+  Sprint 3 draft, from [ADR-0005](../adr/0005-mvp-scope.md) (slice C, plus a first JD Analyzer behind the kill switch) and the "for Sprint 3" notes above. The final backlog is set in S3-01: see [Sprint 3](sprint-03-knowledge-base-and-first-agent.md).
 
   | ID    | Item                                                                                                                                                                                                                               | Requirement IDs            |
   | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
