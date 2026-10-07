@@ -26,3 +26,13 @@ updates:
     groups:
       uv-minor-patch:
         update-types: [minor, patch]
+
+  # The OpenTofu stacks' provider lock files (S3-15). Modules share the stacks' providers.
+  - package-ecosystem: opentofu
+    directories:
+      - /infra/stacks/*
+    schedule:
+      interval: weekly
+    groups:
+      opentofu-providers:
+        patterns: ['*']

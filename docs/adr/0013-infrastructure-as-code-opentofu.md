@@ -133,10 +133,10 @@ infra/
 
 ### 4. State backend and encryption
 
-- **`bootstrap` stack, per account:** an S3 bucket `cv-tailor-tfstate-<account>` and a KMS key with alias `alias/cv-tailor-tfstate`. Deployed once from a laptop. It starts with local state and then moves its own state into the bucket (`tofu init -migrate-state`).
+- **`bootstrap` stack, per account:** an S3 bucket `cv-tailor-tfstate-<account>` and a KMS key with alias `alias/cv-tailor-tfstate`. Deployed once from a laptop with `tofu.sh <env> bootstrap create`, which starts with local state and then moves it into the new bucket (`tofu init -migrate-state`).
 - **The bucket:** versioning on (each state version can be restored), all public access blocked, TLS only, bucket-owner-enforced object ownership, `prevent_destroy`.
 - **Locking:** native S3 locking (`use_lockfile = true`) [3].
-- **Encryption:** every stack has `encryption { key_provider "aws_kms" … method "aes_gcm" … }` for state and plan, with `enforced = true` [2]. OpenTofu then refuses to write unencrypted state.
+- **Encryption:** every stack except `bootstrap` has `encryption { key_provider "aws_kms" … method "aes_gcm" … }` for state and plan, with `enforced = true` [2]. OpenTofu then refuses to write unencrypted state. `bootstrap` creates the key, so its state can't depend on it. That state holds no secrets, only the bucket's and the key's settings, and the bucket encrypts it at rest with the same key.
 - **The KMS key:** a 30-day deletion window and `prevent_destroy`. Its key policy delegates to IAM in the same account, so access comes from IAM policies: SSO administrators and `GithubDeployRole`.
 
 ### 5. CI access (replaces ADR-0004 §4 "Permissions" and §5)
