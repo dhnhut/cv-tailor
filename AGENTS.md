@@ -68,10 +68,10 @@ Each requirement has an ID so sprint backlogs can refer to it.
 | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | KB-01 | The candidate creates a knowledge base about themselves: personal info, career data, work history, skills, certificates, hobbies, and so on. Markdown (`.md`) is supported. |
 | KB-02 | The candidate can upload writing samples, such as past applications with their job descriptions, so the system can match their tone.                                        |
-| KB-03 | Supported upload types are `.txt`, `.md`, `.html`, `.doc`/`.docx`, and `.pdf`, up to **50 MB per file** (the knowledge base limit).                                         |
+| KB-03 | Supported upload types are `.txt`, `.md`, `.html`, `.doc`/`.docx`, and `.pdf`, up to **50 MB (50,000,000 bytes) per file** (the knowledge base limit).                      |
 | KB-04 | Files upload directly to S3 (presigned upload).                                                                                                                             |
 | KB-05 | Knowledge base documents are indexed for retrieval (RAG). Retrieval returns only the owning candidate's documents.                                                          |
-| KB-06 | Each candidate can store up to **50 MB** in total. An admin can change this for a specific candidate.                                                                       |
+| KB-06 | Each candidate can store up to **50 MB (50,000,000 bytes)** and **100 documents** in total. An admin can change this for a specific candidate.                              |
 
 ### 4.3 Application Generation (GEN)
 

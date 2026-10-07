@@ -1,13 +1,13 @@
 // GET /me (S2-09). Returns who the caller is, and creates their profile item on their first call
 // (ADR-0009 §6, ADR-0006). API Gateway's Cognito authorizer has already refused any request
 // without a valid access token carrying the API scope, so this handler only reads its claims.
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { MeResponse } from '@cv-tailor/contracts';
+import { dynamoClient } from '../../aws.ts';
 import { dynamoProfileStore, type ProfileStore } from '../../data/profiles.ts';
 import { requiredEnv } from '../../env.ts';
 import { internalError, jsonResponse } from '../http.ts';
-import { readCaller } from './claims.ts';
+import { readCaller } from '../claims.ts';
 
 export interface MeDependencies {
   readonly store: ProfileStore;
@@ -54,14 +54,9 @@ export const createHandler =
 const allowedOrigin = requiredEnv('ALLOWED_ORIGIN');
 const tableName = requiredEnv('TABLE_NAME');
 
-// Short timeouts and one retry: DynamoDB answers in milliseconds, and the web app is waiting.
-// Two calls at worst (Get, then Put) fit inside the Lambda's 10-second timeout (api-stack.ts).
-// Without throwOnRequestTimeout, the SDK only logs a warning when requestTimeout passes, and the
-// request keeps running until the Lambda times out.
-const client = new DynamoDBClient({
-  maxAttempts: 2,
-  requestHandler: { connectionTimeout: 1_000, requestTimeout: 1_500, throwOnRequestTimeout: true },
-});
+// Two calls at worst (Get, then Put), each with one retry, fit inside the Lambda's 10-second
+// timeout (api-stack.ts). The client's timeouts are in aws.ts.
+const client = dynamoClient();
 
 export const handler = createHandler({
   store: dynamoProfileStore(client, tableName),

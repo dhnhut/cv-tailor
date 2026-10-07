@@ -14,11 +14,16 @@ import { WebStack, type WebConfigAtSynth } from './web-stack.ts';
 // (infra depends on @cv-tailor/web), and deploy.yml builds it before `cdk deploy`.
 const WEB_DIST = fileURLToPath(new URL('../../apps/web/dist', import.meta.url));
 
-// The API's Lambda bundles: the pre sign-up trigger (S2-07) and GET /me (S2-09). Built the same
-// way: `pnpm run check` builds them first (infra depends on @cv-tailor/api), and deploy.yml
-// builds them before `cdk deploy`.
-const PRE_SIGN_UP_DIST = fileURLToPath(new URL('../../apps/api/dist/pre-sign-up', import.meta.url));
-const ME_DIST = fileURLToPath(new URL('../../apps/api/dist/me', import.meta.url));
+// The API's Lambda bundles: the pre sign-up trigger (S2-07), GET /me (S2-09), and the document
+// API (S3-07). Built the same way: `pnpm run check` builds them first (infra depends on
+// @cv-tailor/api), and deploy.yml builds them before `cdk deploy`.
+const apiDist = (name: string) =>
+  fileURLToPath(new URL(`../../apps/api/dist/${name}`, import.meta.url));
+const PRE_SIGN_UP_DIST = apiDist('pre-sign-up');
+const ME_DIST = apiDist('me');
+const CREATE_DOCUMENT_DIST = apiDist('create-document');
+const LIST_DOCUMENTS_DIST = apiDist('list-documents');
+const DELETE_DOCUMENT_DIST = apiDist('delete-document');
 
 // The parts of /config.json known at synth (S2-04, S2-09, S2-10). Checked against the contract
 // here, so a wrong value fails `cdk synth` instead of the web app at start-up. The pool and client
@@ -51,10 +56,11 @@ export class CvTailorStage extends Stage {
     const tableName = dataTableName(config.name);
     const data = new DataStack(this, 'Data', { tableName });
 
-    // Nothing reads its SSM parameters yet. S3-07 (Api) and S3-10 (agents) declare their
-    // dependency on it, as Api does for Auth.
-    new KnowledgeBaseStack(this, 'KnowledgeBase', {
-      bucketName: documentsBucketName(config.name, config.account),
+    // The API finds the bucket by its fixed name, as it finds the table. S3-10 (agents) reads the
+    // knowledge base IDs from SSM.
+    const bucketName = documentsBucketName(config.name, config.account);
+    const knowledgeBase = new KnowledgeBaseStack(this, 'KnowledgeBase', {
+      bucketName,
       knowledgeBaseName: `cv-tailor-${config.name}-kb`,
       webOrigin: `https://${config.host}`,
     });
@@ -92,8 +98,13 @@ export class CvTailorStage extends Stage {
       tableName,
       webOrigin: `https://${config.host}`,
       meDirectory: ME_DIST,
+      documentsBucketName: bucketName,
+      createDocumentDirectory: CREATE_DOCUMENT_DIST,
+      listDocumentsDirectory: LIST_DOCUMENTS_DIST,
+      deleteDocumentDirectory: DELETE_DOCUMENT_DIST,
     });
     api.addStackDependency(auth, 'reads the user pool ID that the auth stack writes');
-    api.addStackDependency(data, 'its Lambda reads and writes the data table');
+    api.addStackDependency(data, 'its Lambdas read and write the data table');
+    api.addStackDependency(knowledgeBase, 'its document Lambdas use the documents bucket');
   }
 }

@@ -1,11 +1,12 @@
 # ADR-0007: Knowledge Base Store, Bedrock Managed Knowledge Base
 
-| Field       | Value         |
-| ----------- | ------------- |
-| Status      | Accepted      |
-| Date        | 2026-10-01    |
-| Deciders    | Project owner |
-| Sprint item | S1-13         |
+| Field       | Value                                                                                                                           |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Status      | Accepted                                                                                                                        |
+| Date        | 2026-10-01                                                                                                                      |
+| Amended     | 2026-10-07: what "50 MB" means, the S3 key layout, the presigned upload, and how a reservation is released are recorded (S3-07) |
+| Deciders    | Project owner                                                                                                                   |
+| Sprint item | S1-13                                                                                                                           |
 
 ## Context
 
@@ -54,6 +55,8 @@ Rejected, because it fails driver 2.
 
 Candidates can upload `.txt`, `.md`, `.html`, `.doc`/`.docx`, and `.pdf`, up to **50 MB per file**, which is the knowledge base's own limit. Each candidate can store up to **50 MB in total** (KB-06). A single file at the maximum size fills the whole allowance.
 
+**"50 MB" is 50,000,000 bytes**, for each file and for the total (S3-07). AWS doesn't say whether the connector's `maxFileSizeInMegaBytes` counts 10^6 or 2^20 bytes per MB. 50,000,000 bytes passes under either reading, so the API never accepts a file that ingestion would skip without saying so. Each candidate can also store at most **100 documents**, which keeps a user's list to one query page and bounds the ingestion work one user can cause.
+
 The S2-12 spike found that the managed S3 connector's own file size filter (`maxFileSizeInMegaBytes`) defaults to 500 MB, while the formats page (source 5) gives 50 MB without saying whether it covers managed knowledge bases. The 50 MB cap holds either way, because it is also the product's limit (KB-03). Sprint 3 enforces it at upload and sets the connector's filter to 50 MB.
 
 ### Ingestion settings
@@ -79,8 +82,13 @@ Set by the knowledge base stack (S3-06), whose test pins them:
 
 ### Upload and delete
 
-- An upload writes the document and its ACL file to S3 together, then starts an ingestion sync.
-- Deleting a document, or an account, removes both files and syncs again.
+- **Key layout:** a document is at `kb/<sub>/<id>.<ext>`, and its ACL file at `kb/<sub>/<id>.<ext>.metadata.json`. The file's real name is kept in DynamoDB only, so a key holds no personal data and no characters that need escaping. The extension tells ingestion how to parse the file.
+- **The API writes the ACL file, never the browser.** `POST /documents` reserves the bytes, writes the ACL file, and only then returns an upload URL, so a document is never in the bucket without its ACL.
+- **Presigned PUT, not a presigned POST.** The URL lives for 5 minutes and signs `content-length`, `content-type`, and `x-amz-checksum-sha256`. S3 refuses a body of another size or another SHA-256, so the hash the API stores is the real content's hash. A presigned POST's policy can fix the key and a size range, but tying the content to the declared hash would need a checksum condition we haven't confirmed POST supports. The bucket's CORS allows `PUT` only.
+- **Unchanged files are skipped.** An upload whose hash matches one of the same user's stored documents returns "unchanged", because overwriting an unchanged file re-indexes it (S2-12). The check never looks at other users' documents, which would tell one user what another stores.
+- **Releasing an upload that never arrived:** a reservation that still has no file in S3 an hour after it was made is released by the next `POST` or `GET /documents` of the same user: its ACL file is deleted, and its item and bytes are freed. The hour is well past the URL's 5 minutes, so a slow upload that started in time isn't released while it's arriving. A stale reservation only blocks its owner, for at most about an hour. A retry of the same file within the hour reuses the reservation with a new URL.
+- **Deleting a document** removes the document, then its ACL file, then its item, which frees its bytes. A retry after a failure still finds the item and finishes the job, and the document is never in the bucket without its ACL. A document still uploading can't be deleted until its upload arrives or its hour passes, because a file arriving after its ACL file was deleted would be left in the bucket.
+- An upload or a delete starts an ingestion sync through the S3 event (S3-08). Deleting an account removes every document and ACL file, and syncs again.
 - The documents bucket is versioned, and old versions expire after 35 days, the same window as the data table's point-in-time recovery. A deleted document can be restored within that window, and is gone for good after it.
 
 ## Consequences

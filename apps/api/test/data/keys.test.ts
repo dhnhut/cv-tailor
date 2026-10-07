@@ -5,6 +5,8 @@ import {
   ENTITY,
   GENERATION_JOB_PREFIX,
   generationJobKey,
+  isId,
+  isSub,
   KB_DOCUMENT_PREFIX,
   kbDocumentKey,
   type Key,
@@ -12,6 +14,7 @@ import {
   newId,
   profileKey,
   quotaOverrideKey,
+  storageUsageKey,
   userPartition,
 } from '../../src/data/keys.ts';
 
@@ -32,6 +35,7 @@ describe('keys match ADR-0006', () => {
     ['monthly counter', () => monthlyCounterKey(SUB, AT), 'QUOTA#MONTH#2026-10'],
     ['KB document', () => kbDocumentKey(SUB, DOC_ID), `DOC#${DOC_ID}`],
     ['generation job', () => generationJobKey(SUB, JOB_ID), `JOB#${JOB_ID}`],
+    ['storage usage', () => storageUsageKey(SUB), 'STORAGE'],
   ])('%s', (_, build, sk) => {
     expect(build()).toEqual({ PK, SK: sk });
   });
@@ -49,6 +53,7 @@ describe('keys match ADR-0006', () => {
       quotaCounter: 'QuotaCounter',
       kbDocument: 'KbDocument',
       generationJob: 'GenerationJob',
+      storageUsage: 'StorageUsage',
     });
   });
 });
@@ -94,6 +99,7 @@ describe('refuses a bad key part, and never repeats it in the error', () => {
     ['monthlyCounterKey', (sub) => monthlyCounterKey(sub, AT)],
     ['kbDocumentKey', (sub) => kbDocumentKey(sub, DOC_ID)],
     ['generationJobKey', (sub) => generationJobKey(sub, JOB_ID)],
+    ['storageUsageKey', (sub) => storageUsageKey(sub)],
   ];
 
   test.each([
@@ -104,6 +110,7 @@ describe('refuses a bad key part, and never repeats it in the error', () => {
     ['an extra key level', `${SUB}#PROFILE`],
     ['a leading space', ` ${SUB}`],
   ])('sub: %s', (_, sub) => {
+    expect(isSub(sub)).toBe(false); // isSub agrees with the key builders
     for (const [, build] of BY_SUB) {
       expect(() => build(sub)).toThrow(/^Invalid sub for a data table key$/);
     }
@@ -122,12 +129,14 @@ describe('refuses a bad key part, and never repeats it in the error', () => {
     ['a trailing newline', `${DOC_ID}\n`],
     ['a path', `../${DOC_ID}`],
   ])('document and job ID: %s', (_, id) => {
+    expect(isId(id)).toBe(false); // isId agrees with the key builders
     expect(() => kbDocumentKey(SUB, id)).toThrow(/^Invalid document ID for a data table key$/);
     expect(() => generationJobKey(SUB, id)).toThrow(/^Invalid job ID for a data table key$/);
   });
 
   test.each(['8', '9', 'a', 'b'])('accepts a UUID v7 with variant digit %s', (variant) => {
     const id = `019ab3c4-5d6e-7f80-${variant}a1b-2c3d4e5f6a7b`;
+    expect(isId(id)).toBe(true);
     expect(kbDocumentKey(SUB, id).SK).toBe(`DOC#${id}`);
     expect(generationJobKey(SUB, id).SK).toBe(`JOB#${id}`);
   });
@@ -143,6 +152,7 @@ test('only document keys start with DOC#, and only job keys with JOB#', () => {
     quotaOverrideKey(SUB),
     dailyCounterKey(SUB, AT),
     monthlyCounterKey(SUB, AT),
+    storageUsageKey(SUB),
   ];
   const doc = kbDocumentKey(SUB, DOC_ID);
   const job = generationJobKey(SUB, JOB_ID);
@@ -151,6 +161,22 @@ test('only document keys start with DOC#, and only job keys with JOB#', () => {
   expect(job.SK.startsWith(GENERATION_JOB_PREFIX)).toBe(true);
   for (const { SK } of [...others, job]) expect(SK.startsWith(KB_DOCUMENT_PREFIX)).toBe(false);
   for (const { SK } of [...others, doc]) expect(SK.startsWith(GENERATION_JOB_PREFIX)).toBe(false);
+});
+
+// isSub and isId let a caller check a value without catching a throw: DELETE /documents/{id}
+// answers 404 to a malformed ID (S3-07). The refusal tables above check every bad value with
+// them too, so they can't drift from the key builders.
+describe('isSub and isId', () => {
+  test('accept the values the key builders accept', () => {
+    expect(isSub(SUB)).toBe(true);
+    expect(isId(DOC_ID)).toBe(true);
+    expect(isId(newId())).toBe(true);
+  });
+
+  // Any lowercase UUID is a sub. Only a UUID v7 is an ID.
+  test('a sub (a UUID v4) is not a document ID', () => {
+    expect(isId(SUB)).toBe(false);
+  });
 });
 
 // S3-03: IDs are UUID v7, so a query with ScanIndexForward: false lists the newest first.

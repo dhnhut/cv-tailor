@@ -58,11 +58,11 @@ export class KnowledgeBaseStack extends Stack {
           abortIncompleteMultipartUploadAfter: Duration.days(1),
         },
       ],
-      // S3-07 keeps only the method its presigned upload uses.
+      // The browser uploads with a presigned PUT (S3-07), sending the two signed headers below.
       cors: [
         {
           allowedOrigins: [webOrigin],
-          allowedMethods: [HttpMethods.POST, HttpMethods.PUT],
+          allowedMethods: [HttpMethods.PUT],
           allowedHeaders: ['content-type', 'x-amz-checksum-sha256'],
           maxAge: 3600,
         },

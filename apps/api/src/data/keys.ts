@@ -13,6 +13,7 @@ export const ENTITY = {
   quotaCounter: 'QuotaCounter',
   kbDocument: 'KbDocument',
   generationJob: 'GenerationJob',
+  storageUsage: 'StorageUsage',
 } as const;
 
 export interface Key {
@@ -34,6 +35,9 @@ const check = (part: string, value: string, pattern: RegExp): string => {
   if (!pattern.test(value)) throw new Error(`Invalid ${part} for a data table key`);
   return value;
 };
+
+export const isSub = (value: string): boolean => SUB.test(value);
+export const isId = (value: string): boolean => ID.test(value);
 
 // A new document or job ID. Only the API creates IDs (S3-03). Needs Node 24.16 or later.
 export const newId = (): string => randomUUIDv7();
@@ -69,3 +73,7 @@ export const generationJobKey = (sub: string, id: string): Key => ({
   PK: userPartition(sub),
   SK: `${GENERATION_JOB_PREFIX}${check('job ID', id, ID)}`,
 });
+
+// One per user: bytes and documents reserved or stored (KB-06). POST /documents updates it in the
+// same transaction as the document item, so the total can't drift from the items.
+export const storageUsageKey = (sub: string): Key => ({ PK: userPartition(sub), SK: 'STORAGE' });

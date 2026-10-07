@@ -232,6 +232,18 @@ Steps 2, 3, and 4 run in parallel on day 1. Steps 5 to 7 (the knowledge base) ru
   - S3-06: for S3-08:
     - the AgentCore CLI's documentation says a knowledge base runs one ingestion job at a time, while ADR-0007 says 50. S3-08 checks the current quota before choosing how to handle collisions;
     - the live check uploads a scanned, image-only PDF, to learn whether its text is indexed with image extraction off.
+  - S3-07: the upload is a presigned PUT, not a presigned POST. It signs the size, the content type, and the SHA-256, so S3 refuses any other body, and the hash the API stores for skipping unchanged files is the real content's hash. The bucket's CORS now allows `PUT` only ([ADR-0007](../adr/0007-knowledge-base-store.md), "Upload and delete").
+  - S3-07: "50 MB" is 50,000,000 bytes, for each file and in total. AWS doesn't say whether the connector's 50 MB filter counts 10^6 or 2^20 bytes per MB, and 50,000,000 passes under either reading.
+  - S3-07: each candidate can store at most 100 documents, enforced in the same conditional update as the bytes. Without it, 1-byte files could make thousands of items and ingestion entries inside 50 MB.
+  - S3-07: a reservation whose file never arrives is released by the same user's next `POST` or `GET /documents`, one hour after it was made. A TTL with a DynamoDB stream was considered: TTL deletion can take days, and it needs a stream and another Lambda. A scheduled sweep would need a scan or an index, which ADR-0006 avoids.
+  - S3-07: `GET /documents` shows a fourth status, `UPLOADING`, before the file is in S3. `DELETE` refuses such a document with `409 upload-in-progress` until it arrives or its hour passes, and the page needs to show why.
+  - S3-07: posting the same file while its first upload hasn't arrived returns `resumed`: the same reservation with a new URL. A retry after a failed upload is then never blocked for an hour, and its bytes aren't counted twice.
+  - S3-07: unchanged files are skipped per user only. Skipping because another user stores the same content would tell one user what another has.
+  - S3-07: the API finds the documents bucket by its fixed name, as it finds the table, not through SSM as the S3-06 details planned. The name is built by the same function as the bucket's, the IAM ARNs stay plain strings, and the SSM parameter stays for the agent runtime.
+  - S3-07: the document API doesn't call Bedrock. After a delete, the S3 event starts the sync (S3-08), so the API's IAM has no `bedrock:` action.
+  - S3-07: each route has its own Lambda (`CreateDocument`, `ListDocuments`, `DeleteDocument`), so each IAM policy holds only the calls its own code makes. `DeleteDocument` can't write or list objects.
+  - S3-07: an earlier draft set the S3 client's `requestChecksumCalculation` to `WHEN_REQUIRED`, on the belief that the SDK's default would add a CRC32 to the presigned URL. Presigning with SDK 3.1146.0 showed it doesn't, because the request carries our own SHA-256. The setting was dropped, and a test pins the URL's query parameters.
+  - S3-07: for S3-09: the page shows `UPLOADING`, uploads one file at a time or retries a `409 conflict`, and the content security policy's `connect-src` needs the bucket's origin (`https://cv-tailor-<env>-documents-<account>.s3.us-east-1.amazonaws.com`) for the PUT.
 - **Lessons learned:**
   - S3-06: the S3-06 details listed two data source changes from the S2-12 notes. Reading the whole connector reference found a third setting, deletion protection, whose default could have kept a deleted document retrievable. A setting with a service default needs its whole reference page read, not only the fields already known.
 - **Next sprint backlog:**

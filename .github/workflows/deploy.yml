@@ -50,7 +50,7 @@ jobs:
       - name: Build the web app (the dev stage uploads apps/web/dist)
         run: pnpm --filter @cv-tailor/web run build
 
-      # Before AWS credentials too: esbuild bundles the pre sign-up trigger (S2-07) and GET /me (S2-09).
+      # Before AWS credentials too: esbuild bundles the pre sign-up trigger (S2-07), GET /me (S2-09), and the document API (S3-07).
       - name: Build the API Lambdas (the dev stage uploads apps/api/dist)
         run: pnpm --filter @cv-tailor/api run build
 

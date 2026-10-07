@@ -9,6 +9,9 @@ import { testApp } from './test-app.ts';
 // the template are plain strings.
 
 const ME = fileURLToPath(new URL('./fixtures/me', import.meta.url));
+const DOCUMENTS = fileURLToPath(new URL('./fixtures/documents', import.meta.url));
+const TABLE_ARN = 'arn:aws:dynamodb:us-east-1:111111111111:table/cv-tailor-dev-data';
+const BUCKET_ARN = 'arn:aws:s3:::cv-tailor-dev-documents-111111111111';
 const ORIGIN = 'https://dev.cv.ikiwii.com';
 
 interface CfnResource {
@@ -22,6 +25,10 @@ describe('API stack', () => {
     tableName: 'cv-tailor-dev-data',
     webOrigin: ORIGIN,
     meDirectory: ME,
+    documentsBucketName: 'cv-tailor-dev-documents-111111111111',
+    createDocumentDirectory: DOCUMENTS,
+    listDocumentsDirectory: DOCUMENTS,
+    deleteDocumentDirectory: DOCUMENTS,
     env: { account: '111111111111', region: 'us-east-1' },
   });
   const template = Template.fromStack(stack);
@@ -92,10 +99,17 @@ describe('API stack', () => {
   // A method added later without the authorizer fails here, before it can be deployed.
   test('every method needs the authorizer and the scope, except preflight', () => {
     const methods = propertiesOf('AWS::ApiGateway::Method');
+    // GET /me, GET and POST /documents, DELETE /documents/{id}, and preflight on /, /me,
+    // /documents, and /documents/{id}.
     expect(methods.map((method) => method.HttpMethod).sort()).toEqual([
+      'DELETE',
+      'GET',
       'GET',
       'OPTIONS',
       'OPTIONS',
+      'OPTIONS',
+      'OPTIONS',
+      'POST',
     ]);
     for (const method of methods) {
       if (method.HttpMethod === 'OPTIONS') {
@@ -107,7 +121,7 @@ describe('API stack', () => {
     }
   });
 
-  test('preflight allows only the web origin, GET, and the Authorization header', () => {
+  test('preflight allows only the web origin, the methods in use, and two headers', () => {
     template.hasResourceProperties('AWS::ApiGateway::Method', {
       HttpMethod: 'OPTIONS',
       Integration: Match.objectLike({
@@ -115,8 +129,8 @@ describe('API stack', () => {
           Match.objectLike({
             ResponseParameters: Match.objectLike({
               'method.response.header.Access-Control-Allow-Origin': `'${ORIGIN}'`,
-              'method.response.header.Access-Control-Allow-Methods': "'GET'",
-              'method.response.header.Access-Control-Allow-Headers': "'Authorization'",
+              'method.response.header.Access-Control-Allow-Methods': "'GET,POST,DELETE'",
+              'method.response.header.Access-Control-Allow-Headers': "'Authorization,Content-Type'",
               'method.response.header.Access-Control-Max-Age': "'3600'",
             }),
           }),
@@ -165,26 +179,126 @@ describe('API stack', () => {
     template.hasResourceProperties('AWS::Logs::LogGroup', { RetentionInDays: 30 });
   });
 
-  // Exact match: a new action or resource needs a decision, as for the pre sign-up trigger.
-  test('the Lambda may only get and put items, in the data table only', () => {
-    const statements = propertiesOf('AWS::IAM::Policy').flatMap(
-      (policy) => (policy.PolicyDocument as { Statement: unknown[] }).Statement,
-    );
-    expect(statements).toEqual([
-      {
-        Effect: 'Allow',
-        Action: ['dynamodb:GetItem', 'dynamodb:PutItem'],
-        Resource: 'arn:aws:dynamodb:us-east-1:111111111111:table/cv-tailor-dev-data',
+  test.each([
+    ['CreateDocument', 20],
+    ['ListDocuments', 20],
+    ['DeleteDocument', 15],
+  ])('runs %s with the table, the bucket, the origin, and a %i-second timeout', (id, timeout) => {
+    const [fn] = Object.entries(template.findResources('AWS::Lambda::Function'))
+      .filter(([logicalId]) => logicalId.startsWith(id))
+      .map(([, resource]) => (resource as CfnResource).Properties);
+    expect(fn).toMatchObject({
+      Runtime: 'nodejs24.x',
+      Architectures: ['arm64'],
+      Handler: 'index.handler',
+      Timeout: timeout,
+      MemorySize: 512,
+      Environment: {
+        Variables: {
+          TABLE_NAME: 'cv-tailor-dev-data',
+          BUCKET_NAME: 'cv-tailor-dev-documents-111111111111',
+          ALLOWED_ORIGIN: ORIGIN,
+        },
       },
-    ]);
+    });
   });
 
-  test('only API Gateway may invoke the Lambda, for GET /me on its real stage', () => {
-    template.resourceCountIs('AWS::Lambda::Permission', 1);
+  test('every Lambda keeps its log for one month', () => {
+    const groups = propertiesOf('AWS::Logs::LogGroup');
+    expect(groups).toHaveLength(4);
+    for (const group of groups) expect(group.RetentionInDays).toBe(30);
+  });
+
+  // Exact match, for each Lambda: a new action or resource needs a decision, as for the pre
+  // sign-up trigger. Each function gets only the calls its own code makes (S3-07).
+  const statementsOf = (functionId: string) => {
+    const found = Object.entries(template.findResources('AWS::IAM::Policy')).filter(([id]) =>
+      id.startsWith(`${functionId}ServiceRoleDefaultPolicy`),
+    );
+    expect(found).toHaveLength(1);
+    return ((found[0]![1] as CfnResource).Properties.PolicyDocument as { Statement: unknown[] })
+      .Statement;
+  };
+  const LIST_KB_PREFIX = {
+    Effect: 'Allow',
+    Action: 's3:ListBucket',
+    Resource: BUCKET_ARN,
+    Condition: { StringLike: { 's3:prefix': 'kb/*' } },
+  };
+
+  test('there is one policy for each Lambda, and no other', () => {
+    template.resourceCountIs('AWS::IAM::Policy', 4);
+  });
+
+  test.each<[string, unknown[]]>([
+    [
+      'Me',
+      [{ Effect: 'Allow', Action: ['dynamodb:GetItem', 'dynamodb:PutItem'], Resource: TABLE_ARN }],
+    ],
+    [
+      'CreateDocument',
+      [
+        {
+          Effect: 'Allow',
+          Action: [
+            'dynamodb:DeleteItem',
+            'dynamodb:GetItem',
+            'dynamodb:PutItem',
+            'dynamodb:Query',
+            'dynamodb:UpdateItem',
+          ],
+          Resource: TABLE_ARN,
+        },
+        {
+          Effect: 'Allow',
+          Action: ['s3:DeleteObject', 's3:PutObject'],
+          Resource: `${BUCKET_ARN}/kb/*`,
+        },
+        LIST_KB_PREFIX,
+      ],
+    ],
+    [
+      'ListDocuments',
+      [
+        {
+          Effect: 'Allow',
+          Action: [
+            'dynamodb:DeleteItem',
+            'dynamodb:GetItem',
+            'dynamodb:Query',
+            'dynamodb:UpdateItem',
+          ],
+          Resource: TABLE_ARN,
+        },
+        { Effect: 'Allow', Action: 's3:DeleteObject', Resource: `${BUCKET_ARN}/kb/*` },
+        LIST_KB_PREFIX,
+      ],
+    ],
+    [
+      'DeleteDocument',
+      [
+        {
+          Effect: 'Allow',
+          Action: ['dynamodb:DeleteItem', 'dynamodb:GetItem', 'dynamodb:UpdateItem'],
+          Resource: TABLE_ARN,
+        },
+        { Effect: 'Allow', Action: 's3:DeleteObject', Resource: `${BUCKET_ARN}/kb/*` },
+      ],
+    ],
+  ])('%s may make only the calls its code makes (exact match)', (functionId, expected) => {
+    expect(statementsOf(functionId)).toEqual(expected);
+  });
+
+  // This API, its live stage, and one method and path each: not any method, path, or stage.
+  test.each([
+    ['GET', '/me'],
+    ['GET', '/documents'],
+    ['POST', '/documents'],
+    ['DELETE', '/documents/*'],
+  ])('only API Gateway may invoke the Lambda for %s %s, on its real stage', (method, path) => {
     template.hasResourceProperties('AWS::Lambda::Permission', {
       Action: 'lambda:InvokeFunction',
       Principal: 'apigateway.amazonaws.com',
-      // This API, its live stage, and GET /me only: not any method, path, or stage.
       SourceArn: {
         'Fn::Join': [
           '',
@@ -193,11 +307,15 @@ describe('API stack', () => {
             { Ref: Match.stringLikeRegexp('^Api') },
             '/',
             { Ref: Match.stringLikeRegexp('^ApiDeploymentStagelive') },
-            '/GET/me',
+            `/${method}${path}`,
           ],
         ],
       },
     });
+  });
+
+  test('there is one invoke permission for each route, and no other', () => {
+    template.resourceCountIs('AWS::Lambda::Permission', 4);
   });
 
   // The table lives in <env>-Data. This stack only refers to it by name.

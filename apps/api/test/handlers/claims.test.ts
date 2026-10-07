@@ -1,6 +1,6 @@
 import type { APIGatewayProxyEvent } from 'aws-lambda';
 import { describe, expect, test } from 'vitest';
-import { ADMIN_GROUP, parseGroups, readCaller } from '../../../src/handlers/me/claims.ts';
+import { ADMIN_GROUP, parseGroups, readCaller } from '../../src/handlers/claims.ts';
 
 // Reading the caller from the authorizer's claims (S2-09). The cognito:groups format isn't
 // documented for REST APIs, so every format seen is a case here.
