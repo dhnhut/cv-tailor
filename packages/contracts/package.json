@@ -11,7 +11,7 @@
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run --coverage",
-    "generate": "node scripts/generate.ts && prettier --write schemas"
+    "generate": "node scripts/generate.ts && prettier --write schemas ../../infra/generated"
   },
   "dependencies": {
     "zod": "^4.6.5"
