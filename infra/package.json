@@ -7,23 +7,15 @@
     "lint": "eslint . && bash scripts/lint-tofu.sh",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run --coverage && bash scripts/tofu-each.sh test",
-    "synth": "cdk synth '**'",
-    "build": "CVT_PLACEHOLDER_ACCOUNTS=1 cdk synth --quiet '**' && bash scripts/tofu-each.sh validate"
+    "build": "bash scripts/tofu-each.sh validate"
   },
   "devDependencies": {
-    "@cv-tailor/api": "workspace:*",
     "@cv-tailor/config": "workspace:*",
     "@cv-tailor/contracts": "workspace:*",
-    "@cv-tailor/web": "workspace:*",
     "@types/node": "^24.19.0",
     "@vitest/coverage-v8": "5.0.2",
-    "aws-cdk": "^2.1143.0",
     "eslint": "^10.11.0",
     "typescript": "~6.0.3",
     "vitest": "^5.0.2"
-  },
-  "dependencies": {
-    "aws-cdk-lib": "^2.271.0",
-    "constructs": "^10.8.0"
   }
 }

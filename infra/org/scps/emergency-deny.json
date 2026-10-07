@@ -10,8 +10,7 @@
         "ArnNotLike": {
           "aws:PrincipalArn": [
             "arn:aws:iam::*:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_*",
-            "arn:aws:iam::*:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_ReadOnlyAccess_*",
-            "arn:aws:iam::*:role/cdk-*-cfn-exec-role-*"
+            "arn:aws:iam::*:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_ReadOnlyAccess_*"
           ]
         }
       }

@@ -19,7 +19,7 @@ jobs:
       id-token: write # lets the job request a GitHub OIDC token for AWS
     concurrency:
       group: deploy-dev
-      cancel-in-progress: false # never stop a CloudFormation update halfway
+      cancel-in-progress: false # never stop an apply halfway: it holds the state lock
     env:
       COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
     steps:
@@ -47,14 +47,25 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       # Before AWS credentials, like install: the build runs third-party code (Vite and its plugins).
-      - name: Build the web app (the dev stage uploads apps/web/dist)
+      - name: Build the web app (deploy-web.sh uploads apps/web/dist)
         run: pnpm --filter @cv-tailor/web run build
 
       # Before AWS credentials too: esbuild bundles the pre sign-up trigger (S2-07), GET /me (S2-09), and the document API (S3-07).
-      - name: Build the API Lambdas (the dev stage uploads apps/api/dist)
+      - name: Build the API Lambdas (the workload stack zips apps/api/dist)
         run: pnpm --filter @cv-tailor/api run build
 
-      # After install, so dependency install scripts never see AWS credentials.
+      # The same version as the check job and the devcontainer (ADR-0013 §1).
+      - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        with:
+          tofu_version: 1.13.1
+          tofu_wrapper: false # the wrapper rewrites tofu's output, which deploy-web.sh reads
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/opentofu/plugins
+          key: tofu-providers-${{ runner.os }}-${{ hashFiles('infra/stacks/workload/.terraform.lock.hcl') }}
+
+      # After install and the builds, so no third-party code sees AWS credentials.
       - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           aws-region: us-east-1
@@ -65,13 +76,22 @@ jobs:
       - name: Show deploy identity
         run: aws sts get-caller-identity --query Arn --output text
 
-      - name: Deploy the dev stage (never '**', ADR-0004 §4)
+      # Only the workload stack, ever: GithubDeployRole can read and write no other state, and
+      # can't change its own access, the budget, the kill switch, or DNS (ADR-0013 §5). The plan
+      # is saved, encrypted, and applied as reviewed in the log.
+      - name: Apply the dev workload stack
         working-directory: infra
-        # The CDK app builds every stage (all three accounts, plus the baseline budget stages),
-        # so synthesis needs every account ID and the alert email, even though only dev/* deploys.
         env:
           CVT_DEV_ACCOUNT_ID: ${{ secrets.CVT_DEV_ACCOUNT_ID }}
-          CVT_STAG_ACCOUNT_ID: ${{ secrets.CVT_STAG_ACCOUNT_ID }}
-          CVT_PROD_ACCOUNT_ID: ${{ secrets.CVT_PROD_ACCOUNT_ID }}
-          CVT_ALERT_EMAIL: ${{ secrets.CVT_ALERT_EMAIL }}
-        run: pnpm exec cdk deploy 'dev/*' --require-approval never --progress events
+          TF_IN_AUTOMATION: '1'
+        run: |
+          scripts/tofu.sh dev workload plan -input=false -out=tfplan
+          scripts/tofu.sh dev workload apply -input=false tfplan
+
+      # Writes config.json from the stack's outputs, checked against the WebConfig contract first.
+      - name: Upload the web app
+        working-directory: infra
+        env:
+          CVT_DEV_ACCOUNT_ID: ${{ secrets.CVT_DEV_ACCOUNT_ID }}
+          TF_IN_AUTOMATION: '1'
+        run: scripts/deploy-web.sh dev

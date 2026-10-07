@@ -4,7 +4,7 @@ How people sign in to the AWS accounts with IAM Identity Center (SSO). There are
 
 ## When to use
 
-- Every day, before running any `aws`, `cdk`, or `pnpm --filter infra` command against a real account.
+- Every day, before running any `aws` or `infra/scripts/tofu.sh` command against a real account.
 - On a new machine or a rebuilt devcontainer.
 - When a new account needs SSO access.
 - When sign-in fails.
@@ -103,7 +103,7 @@ aws sso logout
    ```
 
 3. Sign in as in [1. Daily sign-in](#1-daily-sign-in).
-4. Create the local CDK settings. They hold the account IDs and the budget alert email, and are gitignored:
+4. Create the local infrastructure settings. They hold the account IDs and the budget alert email, are read by `infra/scripts/tofu.sh`, and are gitignored:
 
    ```bash
    cp infra/.env.example infra/.env

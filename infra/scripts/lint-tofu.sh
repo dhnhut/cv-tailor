@@ -16,5 +16,5 @@ tflint --recursive --config="$PWD/.tflint.hcl"
 echo "==> trivy config"
 trivy config --quiet --exit-code 1 --severity HIGH,CRITICAL \
   --ignorefile .trivyignore.yaml \
-  --skip-dirs node_modules --skip-dirs cdk.out --skip-dirs '**/.terraform-*' \
+  --skip-dirs node_modules --skip-dirs '**/.terraform-*' \
   .

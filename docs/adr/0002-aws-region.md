@@ -1,12 +1,12 @@
 # ADR-0002: Single AWS Region, `us-east-1`
 
-| Field       | Value                                                             |
-| ----------- | ----------------------------------------------------------------- |
-| Status      | Accepted                                                          |
-| Date        | 2026-09-27                                                        |
-| Amended     | 2026-09-30: `global.` inference profiles may be used for any task |
-| Deciders    | Project owner                                                     |
-| Sprint item | S0-08                                                             |
+| Field       | Value                                                                                                                                                    |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status      | Accepted                                                                                                                                                 |
+| Date        | 2026-09-27                                                                                                                                               |
+| Amended     | 2026-09-30: `global.` inference profiles may be used for any task; 2026-10-07: the region is set in OpenTofu, and verification step 2 is updated (S3-15) |
+| Deciders    | Project owner                                                                                                                                            |
+| Sprint item | S0-08                                                                                                                                                    |
 
 ## Context
 
@@ -23,7 +23,7 @@ The Sprint 0 plan compared three regions: Auckland (`ap-southeast-6`), Sydney (`
 ### Decision drivers
 
 1. **Every required service in one place.** No feature should be blocked by region.
-2. **Simplicity.** One region means one set of endpoints, IAM ARNs, CDK stacks, and runbooks per environment.
+2. **Simplicity.** One region means one set of endpoints, IAM ARNs, infrastructure stacks, and runbooks per environment.
 3. **Access to new features.** AgentCore and Bedrock are changing fast, and new features and models usually reach `us-east-1` first.
 4. **Latency and data residency** for NZ and AU users.
 
@@ -65,7 +65,7 @@ Use **a single AWS region, `us-east-1`**, for every environment (`dev`, `stag`, 
 
 - All regional resources are deployed to `us-east-1`. CloudFront is global.
 - Model calls may use `global.` inference profiles (worldwide routing) for any task, including as the default. `us.` profiles (US-only routing) stay available. Every call starts in `us-east-1`, which the baseline SCP enforces ([ADR-0004](0004-accounts-and-access.md)).
-- CDK stacks set the region explicitly, not from the developer's local profile.
+- Every OpenTofu provider sets the region explicitly, not from the developer's local profile.
 
 Option C is chosen over Option B for simplicity and feature coverage. At the portfolio stage, keeping data in Australia matters less than having one region with every feature as early as possible.
 
@@ -85,11 +85,11 @@ Option C is chosen over Option B for simplicity and feature coverage. At the por
 
 ### Risks and mitigations
 
-| Risk                                                                 | Mitigation                                                                                                                                                    |
-| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A user or partner requires data residency in NZ or AU.               | Keep region values in one CDK config, not hard-coded, so a second deployment in Sydney stays possible. Sydney had every service at the time of this decision. |
-| A `us-east-1` regional outage affects the 99.9% availability target. | Accepted at the portfolio stage. Multi-region failover is out of scope.                                                                                       |
-| `global.` inference profiles process prompts outside the US.         | Accepted at the portfolio stage: data residency is not a requirement yet. If it becomes one (see below), move PII-bearing tasks to `us.` profiles.            |
+| Risk                                                                 | Mitigation                                                                                                                                                                          |
+| -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A user or partner requires data residency in NZ or AU.               | Keep region values in one place (`infra/modules/settings`), not hard-coded, so a second deployment in Sydney stays possible. Sydney had every service at the time of this decision. |
+| A `us-east-1` regional outage affects the 99.9% availability target. | Accepted at the portfolio stage. Multi-region failover is out of scope.                                                                                                             |
+| `global.` inference profiles process prompts outside the US.         | Accepted at the portfolio stage: data residency is not a requirement yet. If it becomes one (see below), move PII-bearing tasks to `us.` profiles.                                  |
 
 ### When to revisit this decision
 
@@ -100,4 +100,4 @@ Option C is chosen over Option B for simplicity and feature coverage. At the por
 ## Verification
 
 1. `bash scripts/aws-service-check.sh --profile <p>` shows every API probe as `OK` or `DENIED` for `us-east-1`, in each environment account once it exists (Sprint 1).
-2. The CDK app sets `env.region` to `us-east-1` for every stage, and `cdk synth` output contains no other region.
+2. Every OpenTofu provider block sets `region = "us-east-1"`, and `tofu test` checks that the settings module's region is `us-east-1`.

@@ -2,13 +2,13 @@
 
 Service control policies (SCPs) and the organization CloudTrail settings from [ADR-0004](../../docs/adr/0004-accounts-and-access.md) §6–7 (sprint item S1-05).
 
-These are applied by hand from the management account, not by CDK. The files here are the source of truth. When a policy changes, edit the file here first, then apply it with the commands below. `infra/test/org-policies.test.ts` checks the files in CI.
+These are applied by hand from the management account, not by OpenTofu. The files here are the source of truth. When a policy changes, edit the file here first, then apply it with the commands below. `infra/test/org-policies.test.ts` checks the files in CI.
 
 | File                            | Applied to                      | Purpose                                                                                                           |
 | ------------------------------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
 | `scps/baseline.json`            | Root (every member account)     | Deny leaving the Organization or closing the account, region deny, Bedrock inference limit, CloudTrail protection |
 | `scps/log-protection.json`      | `Security` OU                   | Deny deleting or loosening the trail bucket (`org-trail-logs-*`)                                                  |
-| `scps/emergency-deny.json`      | Nothing (created, not attached) | Emergency stop for one account: deny everything except the SSO roles and the CDK CloudFormation execution role    |
+| `scps/emergency-deny.json`      | Nothing (created, not attached) | Emergency stop for one account: deny everything except the SSO roles                                              |
 | `cloudtrail/bucket-policy.json` | Trail bucket in `log-archive`   | Template. Only the CloudTrail service, for the `org-trail` trail, may write. TLS only.                            |
 | `cloudtrail/lifecycle.json`     | Trail bucket in `log-archive`   | Expire logs after 90 days                                                                                         |
 

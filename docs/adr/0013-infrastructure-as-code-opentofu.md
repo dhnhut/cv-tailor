@@ -104,14 +104,14 @@ The open-source fork of Terraform under the Linux Foundation (MPL 2.0). It uses 
 
 ```text
 infra/
-  modules/   reusable pieces: lambda-function, oidc, budget, kill-switch, zone, certificate,
-             data, knowledge-base, auth, auth-domain, web, api
+  modules/   reusable pieces: settings, lambda-function, oidc, budget, kill-switch, zone,
+             certificate, data, knowledge-base, auth, auth-domain, web, api
   stacks/    root modules, one state each: bootstrap, access, baseline, dns, workload
-  envs/      dev.tfvars, stag.tfvars, prod.tfvars (public settings: host, budget, Google client ID,
-             DNS delegations, kill switch initial value)
-  scripts/   tofu.sh, web-config.ts, deploy-web.sh
+  generated/ contracts.json, written by packages/contracts (point 7)
+  scripts/   tofu.sh, tofu-each.sh, lint-tofu.sh, web-config.ts, deploy-web.sh
 ```
 
+- `modules/settings` holds each environment's committed settings: host, budget, Google client ID, DNS delegations, and the kill switch's initial value. Every stack reads its environment's values from it, so a value lives in one place, and its validations and tests replace the CDK app's `config/environments.ts`. A module, not `.tfvars` files, because each stack needs a different subset, and a shared `.tfvars` file warns about every variable a stack doesn't declare.
 - The stacks keep the CDK stage boundaries: `access`, `baseline`, and `dns` are deployed from a laptop, and `workload` by CI.
 - State key: `<env>/<stack>.tfstate`. Separate root modules, not workspaces, because a separate state key per stack lets IAM limit CI to the `workload` state (point 5).
 - Inside `workload`, resources reference each other directly. The SSM parameters and the explicit stack dependencies that CDK needed between stacks go away.

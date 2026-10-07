@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { contracts, WebConfig } from '../src/index.ts';
 
-// What CDK writes for dev. The client ID has Cognito's usual shape: 26 lowercase letters and digits.
+// What the deploy writes for dev. The client ID has Cognito's usual shape: 26 lowercase letters and digits.
 const VALID = {
   environment: 'dev',
   apiUrl: 'https://api.dev.cv.ikiwii.com',
@@ -10,7 +10,7 @@ const VALID = {
   webClientId: '1example23456789abcdefghij',
 } as const;
 
-test('accepts the settings CDK writes', () => {
+test('accepts the settings the deploy writes', () => {
   for (const environment of ['dev', 'stag', 'prod'] as const) {
     expect(WebConfig.parse({ ...VALID, environment })).toEqual({ ...VALID, environment });
   }

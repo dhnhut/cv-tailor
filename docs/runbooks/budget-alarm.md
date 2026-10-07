@@ -78,18 +78,17 @@ Use `--profile cvt-prod-ro` for `prod`.
 
 ## 4. Respond by level
 
-| Alert                                                                 | Response                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Actual 25% or 50%                                                     | Find the driver (step 3). If it's expected, note it and continue. If not, treat it like 80%.                                                                                                                                                                                                                                                                                                                                                 |
-| Actual 80%, or forecast 100%                                          | If the driver is Bedrock, turn the [kill switch](kill-switch.md#2-turn-ai-calls-off) off first: it stops AI calls within 30 seconds and keeps the app running. Otherwise, find the driver and remove it: stop or delete the resource, or delete the workload stack that drives it (`aws cloudformation delete-stack --stack-name <env>-Web --profile cvt-<env>`, or `<env>-Api`). CI recreates it on the next merge, so fix the cause first. |
-| Actual 100%, a driver you can't find, or suspected leaked credentials | [5. Emergency stop](#5-emergency-stop).                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Alert                                                                 | Response                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Actual 25% or 50%                                                     | Find the driver (step 3). If it's expected, note it and continue. If not, treat it like 80%.                                                                                                                                                                                                                                                                                                                                              |
+| Actual 80%, or forecast 100%                                          | If the driver is Bedrock, turn the [kill switch](kill-switch.md#2-turn-ai-calls-off) off first: it stops AI calls within 30 seconds and keeps the app running. Otherwise, find the driver and remove it: stop or delete the resource, or destroy the part of the workload that drives it (`infra/scripts/tofu.sh <env> workload destroy -target=module.api`, or `module.web`). CI recreates it on the next merge, so fix the cause first. |
+| Actual 100%, a driver you can't find, or suspected leaked credentials | [5. Emergency stop](#5-emergency-stop).                                                                                                                                                                                                                                                                                                                                                                                                   |
 
 ## 5. Emergency stop
 
 The `EmergencyDeny` SCP ([`infra/org/scps/emergency-deny.json`](../../infra/org/scps/emergency-deny.json)) denies every action in the account, for every principal except:
 
-- the human SSO roles (`AdministratorAccess` and `ReadOnlyAccess`), so you can still investigate and clean up, and
-- the CDK CloudFormation execution role, so `delete-stack` still works.
+- the human SSO roles (`AdministratorAccess` and `ReadOnlyAccess`), so you can still investigate, and clean up with OpenTofu from your laptop.
 
 It stops app roles, Bedrock calls from the app, CI deploys, and any leaked key at once. It exists in the Organization but is attached to nothing until an emergency.
 
@@ -101,48 +100,31 @@ It stops app roles, Bedrock calls from the app, CI deploys, and any leaked key a
    aws organizations attach-policy --policy-id "$EMERGENCY" --target-id "$ACCOUNT" --profile org-mgmt
    ```
 
-2. Check that it works. SCP changes can take a few minutes to apply.
+2. Check that it works. SCP changes can take a few minutes to apply. The IAM policy simulator includes the Organization's SCPs in its answer (not yet tested in a drill):
 
    ```bash
-   # As a non-exempt principal (the CDK lookup role): expect "explicit deny in a service control policy"
-   (
-     unset AWS_PROFILE
-     eval "$(aws sts assume-role --profile "cvt-$ENV" --role-session-name emergency-check \
-       --role-arn "arn:aws:iam::$ACCOUNT:role/cdk-hnb659fds-lookup-role-$ACCOUNT-us-east-1" \
-       --query 'Credentials' --output json \
-       | jq -r '"export AWS_ACCESS_KEY_ID=\(.AccessKeyId) AWS_SECRET_ACCESS_KEY=\(.SecretAccessKey) AWS_SESSION_TOKEN=\(.SessionToken)"')"
-     aws dynamodb list-tables --region us-east-1
-   )
+   # GithubDeployRole is not exempt: expect false
+   aws iam simulate-principal-policy --profile "cvt-$ENV" \
+     --policy-source-arn "arn:aws:iam::$ACCOUNT:role/GithubDeployRole" --action-names lambda:ListFunctions \
+     --query 'EvaluationResults[0].OrganizationsDecisionDetail.AllowedByOrganizations'
    # As you (exempt): expect a normal result
    aws dynamodb list-tables --profile "cvt-$ENV"
    ```
 
-3. Clean up as the SSO admin. Delete the resources that cost money. To remove a whole CDK stack, use CloudFormation directly. `cdk destroy` doesn't work while the SCP is attached, because the CDK deploy role is denied.
+3. Clean up as the SSO admin, from your laptop. Destroy the parts of the workload that cost money with OpenTofu ([ADR-0013](../adr/0013-infrastructure-as-code-opentofu.md)), which runs as you, so the SCP doesn't stop it. `-target` destroys only that module and what depends on it. The data table, the user pool, and the documents bucket can't be destroyed this way (`prevent_destroy`).
 
-   First the API (S2-09). It holds no data and has no custom resources, so the CloudFormation execution role should be able to delete it on its own (not yet tested in a drill). It goes offline, and `api.<host>` stops resolving. The data table and the user pool are in other stacks and stay.
+   Every workload plan, a destroy included, zips the Lambda bundles, so build them first: `pnpm --filter @cv-tailor/api run build`.
+
+   First the API (S2-09). It holds no data. It goes offline, and `api.<host>` stops resolving:
 
    ```bash
-   aws cloudformation delete-stack --stack-name "$ENV-Api" --profile "cvt-$ENV"
-   aws cloudformation wait stack-delete-complete --stack-name "$ENV-Api" --profile "cvt-$ENV"
+   infra/scripts/tofu.sh "$ENV" workload destroy -target=module.api
    ```
 
-   Then the web app:
+   Then the web app. The sign-in domain depends on it, so it goes too. The site bucket holds only build output, and OpenTofu empties it first (`force_destroy`):
 
    ```bash
-   aws cloudformation delete-stack --stack-name "$ENV-Web" --profile "cvt-$ENV"
-   aws cloudformation wait stack-delete-complete --stack-name "$ENV-Web" --profile "cvt-$ENV"
-   ```
-
-   Expected to fail while `EmergencyDeny` is attached (not yet tested in a drill). A CDK Lambda empties the web bucket before CloudFormation deletes it, and that Lambda's role isn't exempt from the SCP. The stack then ends in `DELETE_FAILED`. Empty the bucket yourself, then delete the stack again without that step. CloudFormation then deletes the empty bucket itself:
-
-   ```bash
-   BUCKET=$(aws cloudformation describe-stack-resources --stack-name "$ENV-Web" --profile "cvt-$ENV" \
-     --query "StackResources[?ResourceType=='AWS::S3::Bucket'].PhysicalResourceId" --output text)
-   AUTO_DELETE=$(aws cloudformation describe-stack-resources --stack-name "$ENV-Web" --profile "cvt-$ENV" \
-     --query "StackResources[?ResourceType=='Custom::S3AutoDeleteObjects'].LogicalResourceId" --output text)
-   aws s3 rm "s3://$BUCKET" --recursive --profile "cvt-$ENV"
-   aws cloudformation delete-stack --stack-name "$ENV-Web" --retain-resources "$AUTO_DELETE" --profile "cvt-$ENV"
-   aws cloudformation wait stack-delete-complete --stack-name "$ENV-Web" --profile "cvt-$ENV"
+   infra/scripts/tofu.sh "$ENV" workload destroy -target=module.web
    ```
 
 4. If credentials leaked, remove them: revoke the SSO session (Identity Center → Users → Active sessions) or the leaked role session, and find how they leaked before going on.
@@ -152,10 +134,10 @@ It stops app roles, Bedrock calls from the app, CI deploys, and any leaked key a
    aws organizations detach-policy --policy-id "$EMERGENCY" --target-id "$ACCOUNT" --profile org-mgmt
    ```
 
-6. Restore the workload. Wait a few minutes, then rerun the last deploy (`gh run rerun <run-id>`) or merge the fix, as in the [deploy runbook](deploy-and-rollback.md#1-normal-deploy-ci).
+6. Restore the workload. Wait a few minutes, then rerun the last deploy (`gh run rerun <run-id>`) or merge the fix, as in the [deploy runbook](deploy-and-rollback.md#1-normal-deploy-ci). CI applies the whole workload stack again, which recreates what step 3 destroyed.
 7. If the charges came from abuse or leaked credentials, open a case with AWS Support (Billing) and ask for a review of the charges.
 
-While the policy is attached, CI deploys to that account fail. This is expected. The OIDC sign-in step still succeeds; the job fails at `cdk deploy` with `BootstrapVersionSsmConfirmationFailed … ssm:GetParameter … no identity-based policy allows`. That message hides the cause. CloudTrail shows the real one: `GithubDeployRole` was denied `sts:AssumeRole` on the CDK deploy role `with an explicit deny in a service control policy` (checked in the 2026-10-01 drill).
+While the policy is attached, CI deploys to that account fail. This is expected. The OIDC sign-in step still succeeds; the job fails at the first AWS call OpenTofu makes, which reads the encrypted state (`kms:GenerateDataKey` or `s3:GetObject`), with an explicit deny in a service control policy. The 2026-10-01 drill checked this with CDK; the OpenTofu message is not yet seen in a drill. CloudTrail shows the denied call either way.
 
 ## 6. Afterwards
 

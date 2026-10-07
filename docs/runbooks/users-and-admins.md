@@ -12,7 +12,7 @@ How to look up a user, and how to add or remove an admin. Membership of the `adm
 
 1. Sign in: `aws sso login --sso-session org` ([account access](account-access.md)).
 2. The person has signed up and confirmed their email address.
-3. Set the environment and look up its user pool. The `<env>-Auth` stack publishes the pool ID in SSM, so no ID is written here. To change `prod`, use `cvt-prod`; to only look, use `cvt-prod-ro`.
+3. Set the environment and look up its user pool. The workload stack publishes the pool ID in SSM, so no ID is written here. To change `prod`, use `cvt-prod`; to only look, use `cvt-prod-ro`.
 
    ```bash
    ENV=dev
@@ -72,7 +72,7 @@ Expected: `admin` after step 2, and nothing after step 3.
 
 ## If it fails
 
-- `ParameterNotFound`: `<env>-Auth` isn't deployed in that account, or the profile is wrong.
+- `ParameterNotFound`: the workload stack isn't applied in that account, or the profile is wrong.
 - `UserNotFoundException`, or `USERNAME` is `None`: no user has that email address in this environment. Check the spelling and `ENV`, and repeat step 1.
 - `ResourceNotFoundException` for the group: group names are case-sensitive. It's `admin`.
 - `ExpiredToken` or `UnauthorizedSSOToken`: sign in again with `aws sso login --sso-session org`.

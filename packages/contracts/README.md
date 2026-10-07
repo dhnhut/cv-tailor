@@ -1,6 +1,6 @@
 # @cv-tailor/contracts
 
-The single source of truth for payloads shared between parts of CV Tailor: the TypeScript API (`apps/api`), the Python agent service (`services/agents`), the web app (`apps/web`), and the CDK app (`infra`).
+The single source of truth for payloads shared between parts of CV Tailor: the TypeScript API (`apps/api`), the Python agent service (`services/agents`), the web app (`apps/web`), and the infrastructure (`infra`).
 
 Contracts are written once, as [Zod](https://zod.dev) schemas. Everything else is generated from them.
 
@@ -19,7 +19,7 @@ services/agents/src/cv_tailor_agents/contracts/*.py   ← generated Pydantic v2,
 | `apps/api` (TS)   | The Zod schema directly: `import { HealthResponse } from '@cv-tailor/contracts'` | Compile time (type) and runtime (`.parse`) |
 | `services/agents` | The generated Pydantic model                                                     | Runtime (`model_validate`) and mypy        |
 | `apps/web` (TS)   | `WebConfig`, to check `/config.json` before the app starts                       | Compile time (type) and runtime (`.parse`) |
-| `infra` (TS)      | `WebConfig`, for the `config.json` that CDK writes (`.omit` checks it at synth)  | Compile time (type) and synth (`.parse`)   |
+| `infra` (TS)      | `WebConfig`, for the `config.json` the deploy writes (`scripts/web-config.ts`)   | Before upload (`.parse`)                   |
 
 Shared constants that aren't schemas, such as the pre sign-up trigger's refusal messages (`@cv-tailor/contracts/sign-in-messages`, read by `apps/api`, and by the web app's sign-in callback from S2-10), live in their own file with a subpath export in `package.json`. They have no zod import, so a Lambda that needs only them stays small, and they're never registered.
 
@@ -85,7 +85,7 @@ To use one contract inside another, reference the schema as usual (`job: JobDesc
 The package has no build step. `package.json` `exports` points at `src/index.ts`, and TypeScript source is read directly:
 
 - `tsc` in every consumer, Vitest in `apps/api` and `apps/web`, and Vite's build in `apps/web` read the `.ts` files. Consumers need `allowImportingTsExtensions` and `erasableSyntaxOnly` in their tsconfig, because the source uses `.ts` import paths.
-- `scripts/generate.ts` runs on Node 24's built-in type stripping (`node scripts/generate.ts`), the same way `infra` runs CDK.
+- `scripts/generate.ts` runs on Node 24's built-in type stripping (`node scripts/generate.ts`), the same way `infra` runs `scripts/web-config.ts`.
 
 ## Files
 

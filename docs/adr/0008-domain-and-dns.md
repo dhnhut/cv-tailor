@@ -1,11 +1,12 @@
 # ADR-0008: Domain and DNS
 
-| Field       | Value         |
-| ----------- | ------------- |
-| Status      | Accepted      |
-| Date        | 2026-10-01    |
-| Deciders    | Project owner |
-| Sprint item | S1-13         |
+| Field       | Value                                                                                  |
+| ----------- | -------------------------------------------------------------------------------------- |
+| Status      | Accepted                                                                               |
+| Date        | 2026-10-01                                                                             |
+| Deciders    | Project owner                                                                          |
+| Sprint item | S1-13                                                                                  |
+| Amended     | 2026-10-07: the zones are managed by OpenTofu's `dns` stack, and were imported (S3-15) |
 
 ## Context
 
@@ -61,7 +62,7 @@ ikiwii.com              registrar DNS (apex; shared by all projects)
 ```
 
 - The apex stays at the registrar, so no AWS account holds shared DNS, and the management account stays free of resources (ADR-0004).
-- Each zone is defined in CDK in a `<env>-dns` stage, deployed from a laptop like `<env>-access` and `<env>-baseline`, with termination protection. CI never changes DNS zones.
+- Each zone is defined in OpenTofu, in a `dns` stack with its own state, applied from a laptop like the `access` and `baseline` stacks, with `prevent_destroy`. CI never changes DNS zones: its role may change only the web app's, the API's, and the sign-in pages' records ([ADR-0013](0013-infrastructure-as-code-opentofu.md) §5). The zones were imported, not recreated, in the move from CDK (S3-15).
 - The delegation records in the `cv.ikiwii.com` zone hold the name servers of the `dev` and `stag` zones. Those values are public DNS data, so they are committed in the environment config. No account trusts another to write its records.
 - Each environment's records for its own endpoints (CloudFront, API Gateway, Cognito) live in its own zone and are deployed with its workload stage.
 

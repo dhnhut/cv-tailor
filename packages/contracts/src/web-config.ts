@@ -10,7 +10,7 @@ const httpsOrigin = z
     'Must be an origin, with no path',
   );
 
-// The web app's settings for one environment. CDK writes them to /config.json at deploy time,
+// The web app's settings for one environment. The deploy writes them to /config.json,
 // and the web app reads them before it renders (S2-04). Not registered in `contracts`: only
 // TypeScript reads this file, so no JSON Schema or Pydantic model is generated for it.
 export const WebConfig = z

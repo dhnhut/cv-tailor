@@ -242,7 +242,7 @@ For comparison, option D adds about 5 state transitions per job (USD 0.000125 af
 
 Checked in S3-10 and S3-12:
 
-1. `cdk synth` shows: the job queue with a 60-minute visibility timeout and a redrive policy to its dead-letter queue after 5 receives; the worker's event source with batch size 1, maximum concurrency 2, and partial batch responses; a 10-minute worker timeout; the runtime's lifecycle at 120 seconds idle and 15 minutes maximum; and an alarm on the dead-letter queue.
+1. `tofu test` shows: the job queue with a 60-minute visibility timeout and a redrive policy to its dead-letter queue after 5 receives; the worker's event source with batch size 1, maximum concurrency 2, and partial batch responses; a 10-minute worker timeout; the runtime's lifecycle at 120 seconds idle and 15 minutes maximum; and an alarm on the dead-letter queue.
 2. Exact-match tests show that the runtime role has no DynamoDB or SQS actions, and that the worker role has only the actions in point 6.
 3. Unit tests show that the worker:
    - doesn't call the runtime for a job that isn't `QUEUED`;
