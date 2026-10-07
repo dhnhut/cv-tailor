@@ -240,9 +240,11 @@ resource "aws_iam_role_policy" "deploy" {
         Condition = { "ForAllValues:StringEquals" = { "route53:ChangeResourceRecordSetsNormalizedRecordNames" = local.record_names } }
       },
       {
-        Sid      = "CertificateRead"
-        Effect   = "Allow"
-        Action   = ["acm:DescribeCertificate", "acm:ListCertificates", "acm:ListTagsForCertificate"]
+        Sid    = "CertificateRead"
+        Effect = "Allow"
+        # GetCertificate returns the public certificate and its chain, never the private key. The
+        # workload's certificate lookup (data "aws_acm_certificate") calls it.
+        Action   = ["acm:DescribeCertificate", "acm:GetCertificate", "acm:ListCertificates", "acm:ListTagsForCertificate"]
         Resource = "*"
       },
 

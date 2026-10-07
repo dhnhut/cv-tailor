@@ -146,6 +146,11 @@ run "deploy_role" {
   }
 
   assert {
+    condition     = one([for s in jsondecode(aws_iam_role_policy.deploy.policy).Statement : s.Action if s.Sid == "CertificateRead"]) == ["acm:DescribeCertificate", "acm:GetCertificate", "acm:ListCertificates", "acm:ListTagsForCertificate"]
+    error_message = "CI may only read certificates. The workload's certificate lookup needs GetCertificate, which returns no private key."
+  }
+
+  assert {
     condition     = one([for s in jsondecode(aws_iam_role_policy.deploy.policy).Statement : s.Resource if s.Sid == "GoogleClientSecret"]) == "arn:aws:secretsmanager:us-east-1:111111111111:secret:cv-tailor/google-client-secret-*"
     error_message = "CI may read the Google client secret only."
   }

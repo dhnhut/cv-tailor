@@ -154,12 +154,22 @@ resource "aws_cognito_identity_provider" "google" {
     client_id        = var.google_client_id
     client_secret    = data.aws_secretsmanager_secret_version.google[0].secret_string
     authorize_scopes = "openid email"
+
+    # Cognito fills in Google's endpoints itself and returns them. Written out, so a plan matches
+    # what AWS stores and never tries to remove them, which could break Google sign-in (S3-15).
+    authorize_url                 = "https://accounts.google.com/o/oauth2/v2/auth"
+    token_url                     = "https://www.googleapis.com/oauth2/v4/token"
+    token_request_method          = "POST"
+    attributes_url                = "https://people.googleapis.com/v1/people/me?personFields="
+    attributes_url_add_attributes = "true"
+    oidc_issuer                   = "https://accounts.google.com"
   }
 
   attribute_mapping = {
     email          = "email"
     email_verified = "email_verified"
     "custom:hd"    = "hd"
+    username       = "sub" # Cognito maps every Google user's username to Google's sub, and returns it
   }
 }
 

@@ -216,9 +216,15 @@ run "google_sign_in" {
 
   assert {
     condition = aws_cognito_identity_provider.google[0].provider_details == tomap({
-      client_id        = "123-abc.apps.googleusercontent.com"
-      client_secret    = "test-google-secret"
-      authorize_scopes = "openid email"
+      client_id                     = "123-abc.apps.googleusercontent.com"
+      client_secret                 = "test-google-secret"
+      authorize_scopes              = "openid email"
+      authorize_url                 = "https://accounts.google.com/o/oauth2/v2/auth"
+      token_url                     = "https://www.googleapis.com/oauth2/v4/token"
+      token_request_method          = "POST"
+      attributes_url                = "https://people.googleapis.com/v1/people/me?personFields="
+      attributes_url_add_attributes = "true"
+      oidc_issuer                   = "https://accounts.google.com"
     })
     error_message = "Google is asked only for the email address, with the secret from Secrets Manager."
   }
@@ -228,6 +234,7 @@ run "google_sign_in" {
       email          = "email"
       email_verified = "email_verified"
       "custom:hd"    = "hd"
+      username       = "sub"
     })
     error_message = "Map the email, whether Google verified it, and hd (S2-13)."
   }
