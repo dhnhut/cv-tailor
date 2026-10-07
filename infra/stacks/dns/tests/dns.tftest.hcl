@@ -142,4 +142,9 @@ run "certificate" {
     )
     error_message = "One CNAME in the environment's own zone validates both names."
   }
+
+  assert {
+    condition     = aws_route53_record.validation.allow_overwrite
+    error_message = "ACM reuses the CNAME for the same domain and account, so an earlier certificate's record must be taken over, not refused."
+  }
 }
