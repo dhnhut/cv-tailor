@@ -69,6 +69,23 @@ BACKEND_CONFIG=(
   -backend-config="key=$env/$stack.tfstate"
 )
 
+# A new account's first run (deploy runbook): the state bucket doesn't exist yet, so the bootstrap
+# stack keeps its state in its working directory while it creates the bucket, then moves it in. If
+# the apply fails, the local state stays, and running `create` again continues from it.
+if [[ $stack == bootstrap && $1 == create ]]; then
+  override="$STACK_DIR/backend_override.tf" # gitignored; OpenTofu merges it over versions.tf
+  local_state="$TF_DATA_DIR/bootstrap.tfstate"
+  trap 'rm -f "$override"' EXIT
+  printf 'terraform {\n  backend "local" {\n    path = "%s"\n  }\n}\n' "$local_state" >"$override"
+  tofu -chdir="$STACK_DIR" init -input=false -lockfile=readonly -reconfigure
+  tofu -chdir="$STACK_DIR" apply
+  rm -f "$override"
+  tofu -chdir="$STACK_DIR" init -input=false -lockfile=readonly -migrate-state -force-copy "${BACKEND_CONFIG[@]}"
+  rm -f "$local_state" "$local_state.backup"
+  echo "The bootstrap state is now in s3://cv-tailor-tfstate-$account/$env/bootstrap.tfstate."
+  exit 0
+fi
+
 if [[ $1 == init ]]; then
   shift
   exec tofu -chdir="$STACK_DIR" init -input=false "${BACKEND_CONFIG[@]}" "$@"
