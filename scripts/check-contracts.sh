@@ -3,7 +3,7 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-GENERATED=(packages/contracts/schemas services/agents/src/cv_tailor_agents/contracts)
+GENERATED=(packages/contracts/schemas services/agents/src/cv_tailor_agents/contracts infra/generated)
 
 pnpm run generate
 

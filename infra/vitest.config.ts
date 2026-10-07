@@ -8,6 +8,8 @@ export default defineConfig({
     // Template.fromStack loads aws-cdk-lib and synthesizes in-process;
     // under parallel `pnpm run check` load this can exceed the 5 s default.
     testTimeout: TEST_TIMEOUT,
-    coverage: coverage({ include: ['bin/**/*.ts', 'lib/**/*.ts', 'config/**/*.ts'] }),
+    coverage: coverage({
+      include: ['bin/**/*.ts', 'lib/**/*.ts', 'config/**/*.ts', 'scripts/**/*.ts'],
+    }),
   },
 });

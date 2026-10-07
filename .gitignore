@@ -172,3 +172,6 @@ vite.config.ts.timestamp-*
 tfplan
 *.tfplan
 backend_override.tf
+# State never lives in the repo: it's in the state bucket, or left by a failed `tofu test`.
+*.tfstate
+*.tfstate.*
