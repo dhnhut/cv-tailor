@@ -103,6 +103,14 @@ run "api" {
 
   assert {
     condition = (
+      aws_api_gateway_gateway_response.cors["UNAUTHORIZED"].status_code == "401"
+      && alltrue([for r in aws_api_gateway_gateway_response.cors : r.response_templates == tomap({ "application/json" = "{\"message\":$context.error.messageString}" })])
+    )
+    error_message = "Each gateway response keeps API Gateway's default status code and body, so a plan matches what AWS stores."
+  }
+
+  assert {
+    condition = (
       aws_api_gateway_stage.live.stage_name == "live"
       && aws_api_gateway_method_settings.throttle.method_path == "*/*"
       && aws_api_gateway_method_settings.throttle.settings[0].throttling_rate_limit == 5

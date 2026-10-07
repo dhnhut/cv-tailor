@@ -96,8 +96,14 @@ locals {
 
   # API Gateway's own errors: 401 from the authorizer, 403 for an unknown route, 429 when
   # throttled, and 5xx. Without the CORS header, the browser hides them from the web app
-  # (ADR-0009 §6). The two defaults cover every type without its own setting.
-  gateway_responses = ["UNAUTHORIZED", "DEFAULT_4XX", "DEFAULT_5XX"]
+  # (ADR-0009 §6). The two defaults cover every type without its own setting. Each keeps API
+  # Gateway's default status code and body, written out so a plan matches what AWS stores.
+  gateway_responses = {
+    UNAUTHORIZED = { status_code = "401" }
+    DEFAULT_4XX  = { status_code = null }
+    DEFAULT_5XX  = { status_code = null }
+  }
+  gateway_error_body = "{\"message\":$context.error.messageString}"
 }
 
 module "functions" {
@@ -231,10 +237,12 @@ resource "aws_api_gateway_integration_response" "preflight" {
 }
 
 resource "aws_api_gateway_gateway_response" "cors" {
-  for_each = toset(local.gateway_responses)
+  for_each = local.gateway_responses
 
   rest_api_id         = aws_api_gateway_rest_api.this.id
   response_type       = each.key
+  status_code         = each.value.status_code
+  response_templates  = { "application/json" = local.gateway_error_body }
   response_parameters = { "gatewayresponse.header.Access-Control-Allow-Origin" = "'${var.web_origin}'" }
 }
 
@@ -247,6 +255,7 @@ resource "aws_api_gateway_deployment" "this" {
       local.routes,
       local.cors_headers,
       local.gateway_responses,
+      local.gateway_error_body,
       var.api_scope,
       [for key in keys(local.routes) : aws_api_gateway_integration.route[key].uri],
       aws_api_gateway_authorizer.cognito.provider_arns,
