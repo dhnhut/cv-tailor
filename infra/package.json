@@ -12,7 +12,7 @@
   "devDependencies": {
     "@cv-tailor/config": "workspace:*",
     "@cv-tailor/contracts": "workspace:*",
-    "@types/node": "^24.19.0",
+    "@types/node": "^26.6.4",
     "@vitest/coverage-v8": "5.0.2",
     "eslint": "^10.11.0",
     "typescript": "~6.0.3",
