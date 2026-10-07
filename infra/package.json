@@ -4,11 +4,11 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "lint": "eslint .",
+    "lint": "eslint . && bash scripts/lint-tofu.sh",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run --coverage",
+    "test": "vitest run --coverage && bash scripts/tofu-each.sh test",
     "synth": "cdk synth '**'",
-    "build": "CVT_PLACEHOLDER_ACCOUNTS=1 cdk synth --quiet '**'"
+    "build": "CVT_PLACEHOLDER_ACCOUNTS=1 cdk synth --quiet '**' && bash scripts/tofu-each.sh validate"
   },
   "devDependencies": {
     "@cv-tailor/api": "workspace:*",

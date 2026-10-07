@@ -15,7 +15,7 @@ concurrency:
 jobs:
   check: # stable job name, required by the branch protection ruleset (S0-06)
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 20 # 15 before S3-15; tofu test downloads the AWS provider on a cold cache
     env:
       COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
       UV_LOCKED: '1' # uv fails if uv.lock is out of date (Python twin of --frozen-lockfile)
@@ -48,8 +48,38 @@ jobs:
           enable-cache: true
           cache-dependency-glob: services/agents/uv.lock
 
+      # The infrastructure tools (S3-15, ADR-0013), at the versions in .devcontainer/install-iac-tools.sh.
+      - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        with:
+          tofu_version: 1.13.1
+          tofu_wrapper: false # the wrapper rewrites tofu's output, which the scripts read
+
+      - uses: terraform-linters/setup-tflint@6ffdbaa3be476b3431f7275c26966ef32ff60337 # v6.3.2
+        with:
+          tflint_version: v0.64.0
+
+      - uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
+        with:
+          version: v0.75.0
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/opentofu/plugins
+            ~/.tflint.d/plugins
+          key: iac-${{ runner.os }}-${{ hashFiles('infra/stacks/*/.terraform.lock.hcl', 'infra/.tflint.hcl') }}
+          restore-keys: iac-${{ runner.os }}-
+
       - name: Tool versions
-        run: node -v && pnpm -v && uv --version && uv run --directory services/agents python --version
+        run: node -v && pnpm -v && uv --version && uv run --directory services/agents python --version && tofu version && tflint --version && trivy --version
+
+      # A step of its own, so the token reaches only TFLint's plugin download (GitHub API rate limit),
+      # not the third-party code that `pnpm run check` runs. Lint then finds the plugin installed.
+      - name: Install the TFLint AWS ruleset
+        working-directory: infra
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: tflint --init --config="$PWD/.tflint.hcl"
 
       - run: pnpm install --frozen-lockfile
 
@@ -57,7 +87,7 @@ jobs:
         run: uv sync
         working-directory: services/agents
 
-      - name: Lint (including workflows), typecheck, test, build (build includes cdk synth)
+      - name: Lint (including workflows), typecheck, test, build (build includes cdk synth and tofu validate)
         run: pnpm run check
 
       # Runs last: it regenerates the contracts, which changes the working tree.
