@@ -87,7 +87,7 @@ jobs:
         run: uv sync
         working-directory: services/agents
 
-      - name: Lint (including workflows), typecheck, test, build (build includes cdk synth and tofu validate)
+      - name: Lint (including workflows), typecheck, test, build (build includes tofu validate)
         run: pnpm run check
 
       # Runs last: it regenerates the contracts, which changes the working tree.

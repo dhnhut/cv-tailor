@@ -1,3 +1,5 @@
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 import { main, webConfigFrom } from '../scripts/web-config.ts';
 
@@ -44,5 +46,21 @@ describe('main', () => {
     expect(main(JSON.stringify(OUTPUTS))).toBe(
       `${JSON.stringify(webConfigFrom(OUTPUTS), null, 2)}\n`,
     );
+  });
+});
+
+describe('as a script', () => {
+  const script = fileURLToPath(new URL('../scripts/web-config.ts', import.meta.url));
+
+  test('reads `tofu output -json` on stdin and writes config.json on stdout, as deploy-web.sh runs it', () => {
+    const stdout = execFileSync(process.execPath, [script], { input: JSON.stringify(OUTPUTS) });
+
+    expect(stdout.toString()).toBe(main(JSON.stringify(OUTPUTS)));
+  });
+
+  test('fails, writing nothing, when a value breaks the contract', () => {
+    const bad = JSON.stringify({ ...OUTPUTS, environment: { value: 'test' } });
+
+    expect(() => execFileSync(process.execPath, [script], { input: bad, stdio: 'pipe' })).toThrow();
   });
 });

@@ -2,7 +2,7 @@
 
 How Google sign-in is set up for an environment, how to rotate the Google client secret, how to find Google profiles that aren't linked to a local user, and how to check account linking. The design is in [ADR-0009](../adr/0009-sign-in-and-api-access.md) §2 and §4.
 
-Each environment has its own Google Cloud project and OAuth client. In `dev`, they are the project `dev-cv-ikiwii` and the client `cognito-dev`. The client ID is public, so it's committed in `GOOGLE_CLIENT_ID` in [`infra/config/environments.ts`](../../infra/config/environments.ts). The client secret is created by hand in the environment's Secrets Manager as `cv-tailor/google-client-secret`. CloudFormation reads it when it creates or changes the Cognito identity provider. It's never committed.
+Each environment has its own Google Cloud project and OAuth client. In `dev`, they are the project `dev-cv-ikiwii` and the client `cognito-dev`. The client ID is public, so it's committed in `google_client_ids` in [`infra/modules/settings`](../../infra/modules/settings/main.tf). The client secret is created by hand in the environment's Secrets Manager as `cv-tailor/google-client-secret`. OpenTofu reads it on every workload plan, and keeps it in the workload state, which is encrypted with KMS before it's written ([ADR-0013](../adr/0013-infrastructure-as-code-opentofu.md) §4). It's never committed.
 
 ## When to use
 
@@ -17,7 +17,7 @@ Each environment has its own Google Cloud project and OAuth client. In `dev`, th
 1. Sign in: `aws sso login --sso-session org` ([account access](account-access.md)).
 2. You can open the environment's Google Cloud project (`dev-cv-ikiwii` for `dev`) with the Google account that owns it.
 3. Set the environment: `ENV=dev`.
-4. Once `<env>-Auth` is deployed, look up its user pool and web client. The stack publishes both IDs in SSM.
+4. Once the workload stack is applied, look up its user pool and web client. The stack publishes both IDs in SSM.
 
    ```bash
    POOL=$(aws ssm get-parameter --name /cv-tailor/auth/user-pool-id --profile "cvt-$ENV" \
@@ -28,7 +28,7 @@ Each environment has its own Google Cloud project and OAuth client. In `dev`, th
 
 ## 1. Set up Google sign-in for an environment
 
-Steps 1.1 to 1.3 come before the deploy that adds the provider. CloudFormation reads the secret during that deploy, and the deploy fails if the secret doesn't exist.
+Steps 1.1 to 1.3 come before the deploy that adds the provider. OpenTofu reads the secret when it plans that deploy, and the plan fails if the secret doesn't exist.
 
 ### 1.1 Google project and consent screen
 
@@ -77,9 +77,9 @@ Expected: `true`. Google client secrets start with `GOCSPX-`, so `false` means a
 
 ### 1.4 Commit the client ID
 
-1. Add the client ID to `GOOGLE_CLIENT_ID` in `infra/config/environments.ts`.
-2. Update the tests that expect only `dev` to have Google sign-in, in `infra/test/environments.test.ts` and `infra/test/stages.test.ts`.
-3. Follow the [git flow](../sprints/README.md#git-flow). Before merging, `cdk diff` for the environment shows one new `AWS::Cognito::UserPoolIdentityProvider`, `Google` added to the web client, and no replaced user pool ([deploy runbook, step 2](deploy-and-rollback.md#2-preview-a-change)).
+1. Add the client ID to `google_client_ids` in `infra/modules/settings/main.tf`.
+2. Update the test that expects the environment to have no Google sign-in, in `infra/stacks/access/tests/settings.tftest.hcl`.
+3. Follow the [git flow](../sprints/README.md#git-flow). Before merging, the environment's workload plan creates `module.auth.aws_cognito_identity_provider.google[0]`, updates the web client in place to add `Google`, and replaces no user pool ([deploy runbook, step 2](deploy-and-rollback.md#2-preview-a-change)).
 4. After the deploy, run [Verify](#verify).
 
 ## 2. Rotate the client secret
@@ -96,22 +96,7 @@ A Google client can have two secrets, and both work until one is disabled, so ro
    unset GOOGLE_SECRET
    ```
 
-3. Push it to Cognito. CloudFormation reads the secret only when it creates or changes the identity provider, so the next deploy doesn't pick up a new value ([CloudFormation: Secrets Manager references](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/dynamic-references-secretsmanager.html)). This sends the client ID and scopes that CDK sets:
-
-   ```bash
-   CLIENT_ID=$(aws cognito-idp describe-identity-provider --user-pool-id "$POOL" \
-     --provider-name Google --profile "cvt-$ENV" \
-     --query IdentityProvider.ProviderDetails.client_id --output text)
-   DETAILS=$(aws secretsmanager get-secret-value --secret-id cv-tailor/google-client-secret \
-     --profile "cvt-$ENV" --query SecretString --output text \
-     | jq -cR --arg id "$CLIENT_ID" '{client_id: $id, client_secret: ., authorize_scopes: "openid email"}')
-   aws cognito-idp update-identity-provider --user-pool-id "$POOL" --provider-name Google \
-     --profile "cvt-$ENV" --provider-details "$DETAILS" \
-     --query IdentityProvider.LastModifiedDate --output text
-   unset DETAILS
-   ```
-
-   Expected: a timestamp. Keep the `--query`, because the response includes the client secret.
+3. Apply it. OpenTofu reads the secret on every workload plan, so the next deploy sends it to Cognito. Rerun the last `dev` deploy (`gh run rerun <run-id>`, [deploy runbook](deploy-and-rollback.md#1-normal-deploy-ci)), or merge any change. The plan shows one in-place update: `module.auth.aws_cognito_identity_provider.google[0]`, with its `provider_details` hidden as `(sensitive value)`.
 
 4. Run [Verify](#verify), steps 1 and 3. The mapping must still show `email` and `email_verified`, and a Google sign-in must work.
 5. In Google's console, **Disable** the old secret, sign in with Google again, then delete the old secret.
@@ -412,9 +397,9 @@ Expected:
 ## If it fails
 
 - **Google shows `Error 400: redirect_uri_mismatch`:** the client's redirect URI isn't exactly `https://auth.<host>/oauth2/idpresponse`. Fix it in step 1.2.
-- **The callback has `error=…` instead of `code=` after the Google step:** if `error_description` starts with `PreSignUp failed with error`, the pre sign-up trigger refused the sign-in; see the trigger's messages below. Otherwise it's usually a wrong client ID or secret. Check `GOOGLE_CLIENT_ID` and the check in step 1.3. After fixing the secret, push it to Cognito (section 2, step 3), because a deploy doesn't.
-- **The deploy fails because Secrets Manager can't find `cv-tailor/google-client-secret`:** the secret isn't in that account, or has another name. CloudFormation rolls the stack back by itself. Do step 1.3, then rerun the deploy ([deploy runbook, step 5](deploy-and-rollback.md#5-a-deploy-failed)).
-- **The deploy fails because the CloudFormation execution role isn't allowed `secretsmanager:GetSecretValue`:** the role has `AdministratorAccess` today ([ADR-0004](../adr/0004-accounts-and-access.md) §5). If it's scoped down, it needs that action on this secret.
+- **The callback has `error=…` instead of `code=` after the Google step:** if `error_description` starts with `PreSignUp failed with error`, the pre sign-up trigger refused the sign-in; see the trigger's messages below. Otherwise it's usually a wrong client ID or secret. Check `google_client_ids` and the check in step 1.3. After fixing the secret, apply it (section 2, step 3).
+- **The plan fails because Secrets Manager can't find `cv-tailor/google-client-secret`:** the secret isn't in that account, or has another name. The plan fails before any change. Do step 1.3, then rerun the deploy ([deploy runbook, step 5](deploy-and-rollback.md#5-a-deploy-failed)).
+- **The plan fails because `GithubDeployRole` isn't allowed `secretsmanager:GetSecretValue`:** the role may read only `cv-tailor/google-client-secret-*` (its `GoogleClientSecret` statement, [ADR-0013](../adr/0013-infrastructure-as-code-opentofu.md) §5). A secret with another name needs a change to the access stack first.
 - **No Google button on the managed login page:** the web client doesn't list Google. Check [Verify](#verify), step 2.
 - **Google shows `Error 401: deleted_client`:** Google deletes clients that are unused for 6 months, and emails a warning 30 days before. Restore it from **Deleted credentials** within 30 days, or create a new client (steps 1.2 to 1.4).
 - **`email_verified` isn't `true`:** check the mapping ([Verify](#verify), step 1). Without the `email_verified` mapping, Cognito stores every Google email address as unverified.

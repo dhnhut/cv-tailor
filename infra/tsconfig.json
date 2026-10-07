@@ -4,11 +4,7 @@
   "compilerOptions": {
     "types": ["node"],
     "allowImportingTsExtensions": true,
-    "erasableSyntaxOnly": true,
-    // aws-cdk-lib isn't compiled with this option, and some of its classes don't fit their own
-    // interfaces under it (Bucket → IBucket, Table → ITable, RestApi → IRestApi). Off for infra
-    // only; every other package keeps it (S2-04).
-    "exactOptionalPropertyTypes": false
+    "erasableSyntaxOnly": true
   },
-  "include": ["bin", "config", "lib", "scripts", "test", "vitest.config.ts"]
+  "include": ["scripts", "test", "vitest.config.ts"]
 }

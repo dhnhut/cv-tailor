@@ -5,7 +5,6 @@ CLAUDE.md
 .turbo/
 .vitest/
 *.local
-cdk.out/
 
 # python
 .venv/

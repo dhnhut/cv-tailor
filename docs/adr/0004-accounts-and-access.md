@@ -1,11 +1,12 @@
 # ADR-0004: AWS Account Structure and Access
 
-| Field       | Value         |
-| ----------- | ------------- |
-| Status      | Accepted      |
-| Date        | 2026-09-29    |
-| Deciders    | Project owner |
-| Sprint item | S1-02         |
+| Field       | Value                                                                                                                                                                                                                                     |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status      | Accepted                                                                                                                                                                                                                                  |
+| Date        | 2026-09-29                                                                                                                                                                                                                                |
+| Deciders    | Project owner                                                                                                                                                                                                                             |
+| Sprint item | S1-02                                                                                                                                                                                                                                     |
+| Amended     | 2026-10-07: the infrastructure moved from CDK to OpenTofu (S3-15). §4's permissions and §5 are superseded by [ADR-0013](0013-infrastructure-as-code-opentofu.md) §4–5, and the emergency deny SCP no longer exempts a CloudFormation role |
 
 ## Context
 
@@ -105,7 +106,7 @@ Rules:
 
 - **Naming:** `<project>-<env>` for workload accounts. Shared accounts get a plain name (`log-archive`).
 - **Root email addresses:** each account has its own address, and all of them deliver to one mailbox (plus-aliases or addresses on an owned domain). The real addresses are not recorded in this repository.
-- **Account IDs:** not recorded in this repository either, because it is public. The CDK app reads them from `CVT_<ENV>_ACCOUNT_ID` environment variables, set in a local, gitignored `infra/.env` or by CI.
+- **Account IDs:** not recorded in this repository either, because it is public. `infra/scripts/tofu.sh` reads them from `CVT_<ENV>_ACCOUNT_ID` environment variables, set in a local, gitignored `infra/.env` or by CI.
 - **Management root user:** MFA on, used only for break-glass tasks that need root.
 - **Member root users:** **centralized root access management** is turned on. Member accounts have no root password, access keys, or MFA devices to lose. A task that needs root in a member account (for example deleting a bucket policy that locks everyone out) runs from the management account as a short-lived privileged session (`sts:AssumeRoot`).
 - **Management-to-member access role:** every member account keeps the default `OrganizationAccountAccessRole` that Organizations creates. The management account can assume it, and it has administrator permissions. It is a break-glass path only. Daily access uses IAM Identity Center.
@@ -129,22 +130,14 @@ Rules:
 Each workload account has one IAM OIDC identity provider for `token.actions.githubusercontent.com`, and one deploy role (`GithubDeployRole`).
 
 - **Trust:** `sts:AssumeRoleWithWebIdentity` only when `aud` is `sts.amazonaws.com` and `sub` is exactly `repo:dhnhut@5567608/cv-tailor@1386961484:environment:<env>`. This is GitHub's immutable subject format, which adds the numeric owner and repository IDs to the names. A renamed, transferred, or deleted-and-re-created repository gets new IDs, so it can't match. The IDs are public, so they are committed. Trusting the GitHub Environment, not a branch, means the Environment's protection rules (branch filter, and later manual approval for `prod`) also protect the AWS role.
-- **Permissions:** only `sts:AssumeRole` on `arn:aws:iam::<account>:role/cdk-*`, and only when the target role's `aws-cdk:bootstrap-role` tag is `deploy`, `file-publishing`, `image-publishing`, or `lookup`. Bootstrap tags exactly those four roles. The CloudFormation execution role has no such tag, so the deploy role can't assume it, and neither can it assume any other role that happens to be named `cdk-*`. The deploy role can't touch any resource directly. It can only hand work to the CDK bootstrap roles.
-- The provider and role are defined in CDK (`OidcStack`). The provider is the native `AWS::IAM::OIDCProvider` resource, so no Lambda-backed custom resource is needed. They are deployed once per account from a laptop with SSO credentials, because CI can't deploy before the role exists.
-- `OidcStack` lives in its own stage, `<env>-access`, apart from the workload stage `<env>`. CI deploys `<env>/*` only, so a CI deploy never changes the role CI signs in with. Changing the trust is a laptop-only change. CI must never deploy with the `'**'` selector.
-- `OidcStack` has termination protection, because deleting it breaks every deploy.
+- **Permissions:** since S3-15, the role changes the workload's resources itself, limited to this environment's names, with a permissions boundary on every role it creates and explicit denies on CI's own access, the budget, the kill switch, the hosted zones, other stacks' state, and user data ([ADR-0013](0013-infrastructure-as-code-opentofu.md) §5). Before S3-15, it could only hand work to the CDK bootstrap roles.
+- The provider and role are defined in OpenTofu, in the `access` stack. They are applied once per account from a laptop with SSO credentials, because CI can't deploy before the role exists.
+- The `access` stack has its own state, apart from the `workload` stack. CI applies only `workload`, and can't read or write the `access` state, so a CI deploy never changes the role CI signs in with. Changing the trust is a laptop-only change.
+- The provider and the role have `prevent_destroy`, because deleting either breaks every deploy.
 
-### 5. CDK bootstrap trust model
+### 5. CDK bootstrap trust model (superseded)
 
-```text
-GithubDeployRole (assumed through OIDC)
-  └─ cdk-*-deploy-role, cdk-*-file-publishing-role, cdk-*-image-publishing-role, cdk-*-lookup-role
-      └─ cdk-*-cfn-exec-role  (used by CloudFormation only; changes resources)
-```
-
-- Each workload account is bootstrapped by itself in `us-east-1`. No account trusts another (`--trust` is not used), because there is no central tooling account. Each environment deploys only inside its own account.
-- Bootstrap runs with `--termination-protection`, because every deploy in the account depends on the `CDKToolkit` stack.
-- The CloudFormation execution role keeps the default `AdministratorAccess` policy. This is an accepted risk: only CloudFormation can assume the role, the OIDC trust is narrow, and the SCPs still apply. Scoping it down with `--cloudformation-execution-policies` is the planned hardening step (see "When to revisit").
+Superseded by [ADR-0013](0013-infrastructure-as-code-opentofu.md) §4–5 in S3-15. There is no bootstrap trust chain any more: `GithubDeployRole` calls AWS directly, within the limits above, and each account's `bootstrap` stack holds only the encrypted state bucket and its key. Before S3-15, `GithubDeployRole` could assume only the four tagged CDK bootstrap roles, and only CloudFormation's execution role, with `AdministratorAccess`, changed resources.
 
 ### 6. Service control policies
 
@@ -155,7 +148,7 @@ AWS allows at most 5 SCPs per target, and `FullAWSAccess` counts as one. Stateme
 | Root                              | Baseline       | 1. Deny `organizations:LeaveOrganization` and `account:CloseAccount`. Accounts are closed only from the management account, where SCPs don't apply. <br> 2. **Region deny:** deny every action when `aws:RequestedRegion` is not in the allowed list. A `NotAction` list exempts global services (IAM, Organizations, STS, CloudFront, Budgets, Route 53, Support, Cost Explorer, and similar), taken from the AWS example SCP. It also exempts Bedrock inference actions. <br> 3. **Bedrock inference:** deny Bedrock inference actions outside the allowed regions unless the request uses a `us.` or `global.` inference profile (`bedrock:InferenceProfileArn`). <br> 4. Deny `cloudtrail:StopLogging`, `cloudtrail:DeleteTrail`, `cloudtrail:UpdateTrail`, and `cloudtrail:PutEventSelectors`. |
 | `Security`                        | Log protection | Deny deleting the trail bucket, deleting objects in it, and changing its bucket policy, lifecycle, Block Public Access, or object ownership. A real change is made by detaching the SCP from the management account, making the change, and attaching it again.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `Prod`                            | None yet       | Reserved for prod-only rules (for example denying deletion of data stores).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| One account, only in an emergency | Emergency deny | Deny every action except for the human SSO roles (`AdministratorAccess`, `ReadOnlyAccess`) and the CDK CloudFormation execution role, which deletes stacks. It stops every cost source in the account, including CI. It is created but not attached, and it is attached to one account only during a cost or security incident ([budget alarm runbook](../runbooks/budget-alarm.md)).                                                                                                                                                                                                                                                                                                                                                                                                               |
+| One account, only in an emergency | Emergency deny | Deny every action except for the human SSO roles (`AdministratorAccess`, `ReadOnlyAccess`), which clean up with OpenTofu from a laptop. It stops every cost source in the account, including CI. It is created but not attached, and it is attached to one account only during a cost or security incident ([budget alarm runbook](../runbooks/budget-alarm.md)).                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 
 - **Why the baseline attaches to Root:** Root covers every member account, including `log-archive` and future projects, and never covers the management account. One attachment replaces one per OU.
 - **Bedrock cross-region inference:** `us.` and `global.` inference profiles are called in `us-east-1` but can run the request in other regions (other US regions for `us.`, any supported commercial region for `global.`). A plain region deny would block those calls, so statement 2 skips Bedrock inference, and statement 3 allows it outside `us-east-1` only through a `us.` or `global.` profile. The `us.` part follows the AWS example SCP for cross-region inference; the `global.` part follows the Bedrock documentation, which exempts the region-less global model check (`aws:RequestedRegion` = `unspecified`) by profile ARN instead of allowing `unspecified` for every service. It needs no list of destination regions, so it keeps working when AWS changes a profile's routing. A direct call to a model in another region is still denied, and every call must start in `us-east-1`.
@@ -190,7 +183,7 @@ AWS allows at most 5 SCPs per target, and `FullAWSAccess` counts as one. Stateme
 
 - Four member accounts to maintain, plus the management account.
 - The Organization, Identity Center, SCPs, and trail are set up by hand, not by Control Tower or infrastructure as code. The runbooks (S1-12) and the SCP JSON in the repo record the setup.
-- The CloudFormation execution role is broad (`AdministratorAccess`) in each account.
+- `GithubDeployRole` can change workload resources directly. Its policy and the permissions boundary must be kept up to date ([ADR-0013](0013-infrastructure-as-code-opentofu.md) §5).
 - Every deploy role, bootstrap, and budget is repeated in each workload account.
 
 ### Risks and mitigations
@@ -199,7 +192,7 @@ AWS allows at most 5 SCPs per target, and `FullAWSAccess` counts as one. Stateme
 | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | The region-deny SCP blocks Bedrock cross-region inference.          | Bedrock inference outside `us-east-1` is allowed through `us.` and `global.` inference profiles. Real `converse` calls through both are tested in `dev` before the SCP is attached to Root. |
 | A new SCP locks everyone out, including CI.                         | SCPs never apply to the management account, which can detach any SCP. New SCPs go to `NonProd` first.                                                                                       |
-| An OIDC trust that is too broad lets another branch or fork deploy. | The `sub` condition matches one repository and one GitHub Environment exactly. The Environment is limited to `main`. A CDK test checks the trust policy.                                    |
+| An OIDC trust that is too broad lets another branch or fork deploy. | The `sub` condition matches one repository and one GitHub Environment exactly. The Environment is limited to `main`. A `tofu test` checks the trust policy.                                 |
 | Loss of the management account root MFA device.                     | Root is break-glass only. Account recovery goes through AWS Support with the root email address.                                                                                            |
 | `stag` differs from `prod` once `prod` has its own SCPs.            | Move `stag` into `Prod` or its own OU when prod-only SCPs are added (see below).                                                                                                            |
 
@@ -208,7 +201,7 @@ AWS allows at most 5 SCPs per target, and `FullAWSAccess` counts as one. Stateme
 - **Prod-only SCPs are added:** `stag` should run under the same rules to be a faithful rehearsal of `prod`. Move it into `Prod`, or into its own OU.
 - **`dev` needs looser rules than `stag`,** for example for experiments: add a `Sandbox` OU.
 - **More than about 10 accounts, or a second person joins:** consider Control Tower, or managing the Organization as code, and switch Identity Center MFA to always-on.
-- **`prod` gets real users:** add prod-only SCPs and a manual approval gate on the `prod` GitHub Environment, and scope down the CloudFormation execution role.
+- **`prod` gets real users:** add prod-only SCPs and a manual approval gate on the `prod` GitHub Environment, and review `GithubDeployRole`'s policy and the workload boundary for `prod`.
 - **Identity Center access is proven in every account:** restrict or remove `OrganizationAccountAccessRole`, keeping `sts:AssumeRoot` and the management account as the break-glass path.
 - **Identity Center needs day-to-day administration:** delegate it to a member account, so the management account is used even less.
 

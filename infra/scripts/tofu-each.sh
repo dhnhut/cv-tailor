@@ -21,8 +21,10 @@ shopt -s nullglob
 for dir in "$INFRA_DIR"/stacks/*/; do
   dir=${dir%/}
   echo "==> stacks/$(basename "$dir"): tofu $command"
-  # Its own working directory, apart from the per-environment ones that tofu.sh uses.
-  export TF_DATA_DIR="$dir/.terraform-check"
+  # Its own working directory per command, apart from the per-environment ones that tofu.sh uses.
+  # `pnpm run check` runs validate (build) and test at the same time, and a shared directory let
+  # one init replace the provider while the other was starting it.
+  export TF_DATA_DIR="$dir/.terraform-check-$command"
   if ! output=$(tofu -chdir="$dir" init -backend=false -input=false -lockfile=readonly 2>&1); then
     echo "$output" >&2
     exit 1

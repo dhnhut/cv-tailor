@@ -119,14 +119,13 @@ describe('emergency deny SCP', () => {
     expect(deny.Resource).toBe('*');
   });
 
-  test('exempts only the human SSO roles and the CDK CloudFormation execution role', () => {
-    // Exact list, so widening the break-glass path is a reviewed change.
+  test('exempts only the human SSO roles', () => {
+    // Exact list, so widening the break-glass path is a reviewed change. Teardown in an emergency
+    // runs as AdministratorAccess from a laptop (ADR-0013 §10), so no deploy role is exempt.
     expect(Object.keys(deny.Condition ?? {})).toEqual(['ArnNotLike']);
     expect(deny.Condition?.ArnNotLike?.['aws:PrincipalArn']).toEqual([
       'arn:aws:iam::*:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_*',
       'arn:aws:iam::*:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_ReadOnlyAccess_*',
-      // CloudFormation deletes a stack with the role that deployed it.
-      'arn:aws:iam::*:role/cdk-*-cfn-exec-role-*',
     ]);
   });
 });

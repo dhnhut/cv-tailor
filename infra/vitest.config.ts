@@ -1,15 +1,10 @@
 import { coverage } from '@cv-tailor/config/vitest';
 import { defineConfig } from 'vitest/config';
 
-const TEST_TIMEOUT = 30_000; // 30 seconds
-
+// The TypeScript in infra: the deploy scripts and the organization policy checks. The OpenTofu
+// code is tested with `tofu test` (scripts/tofu-each.sh, ADR-0013 §9).
 export default defineConfig({
   test: {
-    // Template.fromStack loads aws-cdk-lib and synthesizes in-process;
-    // under parallel `pnpm run check` load this can exceed the 5 s default.
-    testTimeout: TEST_TIMEOUT,
-    coverage: coverage({
-      include: ['bin/**/*.ts', 'lib/**/*.ts', 'config/**/*.ts', 'scripts/**/*.ts'],
-    }),
+    coverage: coverage({ include: ['scripts/**/*.ts'] }),
   },
 });

@@ -14,7 +14,7 @@ import tseslint from 'typescript-eslint';
 export function createConfig({ tsconfigRootDir, browser = false }) {
   return defineConfig(
     // 1. Never lint build output, coverage, or generated code.
-    { ignores: ['**/dist/**', '**/cdk.out/**', '**/coverage/**', '**/*.gen.*'] },
+    { ignores: ['**/dist/**', '**/coverage/**', '**/*.gen.*'] },
 
     // 2. ESLint's core recommended rules (all files).
     js.configs.recommended,

@@ -33,6 +33,10 @@ export function main(tofuOutputJson: string): string {
   return `${JSON.stringify(webConfigFrom(JSON.parse(tofuOutputJson) as TofuOutputs), null, 2)}\n`;
 }
 
+// Runs only when Node runs this file as a script, in a child process that coverage can't see.
+// test/web-config.test.ts runs it that way.
+/* v8 ignore start */
 if (import.meta.main) {
   process.stdout.write(main(readFileSync(0, 'utf8')));
 }
+/* v8 ignore stop */

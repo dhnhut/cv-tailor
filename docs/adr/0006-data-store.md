@@ -1,12 +1,12 @@
 # ADR-0006: Data Store, a Single DynamoDB Table
 
-| Field       | Value                                                                                                                                                                                                                                                                                                                                                     |
-| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Status      | Accepted                                                                                                                                                                                                                                                                                                                                                  |
-| Date        | 2026-10-01                                                                                                                                                                                                                                                                                                                                                |
-| Amended     | 2026-10-03: the table's resource type, its guards against replacement, and UTC quota periods are recorded, and verification steps 1 and 4 are updated (S2-08); 2026-10-06: document and job IDs are lowercase UUID v7, and verification step 5 is added (S3-03); 2026-10-07: the `StorageUsage` item and the `KbDocument` attributes are recorded (S3-07) |
-| Deciders    | Project owner                                                                                                                                                                                                                                                                                                                                             |
-| Sprint item | S1-13                                                                                                                                                                                                                                                                                                                                                     |
+| Field       | Value                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Status      | Accepted                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Date        | 2026-10-01                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Amended     | 2026-10-03: the table's resource type, its guards against replacement, and UTC quota periods are recorded, and verification steps 1 and 4 are updated (S2-08); 2026-10-06: document and job IDs are lowercase UUID v7, and verification step 5 is added (S3-03); 2026-10-07: the `StorageUsage` item and the `KbDocument` attributes are recorded (S3-07); 2026-10-07: the table is an OpenTofu `aws_dynamodb_table`, and the operations and verification step 1 are updated (S3-15) |
+| Deciders    | Project owner                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Sprint item | S1-13                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 
 ## Context
 
@@ -38,7 +38,7 @@ The kill switch is a flag in SSM Parameter Store, not a DynamoDB item.
 ### Option A: DynamoDB, one table per entity
 
 - **Pros:** each table has a simple key that matches its entity. IAM can be scoped to one table per function.
-- **Cons:** every new entity adds a table, with its own CDK definition, grants, backup setting, and tests. Deleting an account touches every table.
+- **Cons:** every new entity adds a table, with its own infrastructure definition, grants, backup setting, and tests. Deleting an account touches every table.
 
 Rejected, because it fails driver 4 without a benefit the MVP needs.
 
@@ -107,10 +107,10 @@ Rejected, because it fails driver 2. The managed knowledge base ([ADR-0007](0007
 
 ### Operations
 
-- The table is defined in CDK in the workload stage, in its own stack, `<env>-Data`. Point-in-time recovery is on, because the table holds user data.
-- The table is an `AWS::DynamoDB::GlobalTable` with one replica in `us-east-1` (CDK's `TableV2`, which CDK prefers for every table [3]). A global table in a single region is billed the same as a single-region table. CloudFormation can't change an `AWS::DynamoDB::Table` into a `GlobalTable` in place, and trying "might result in the deletion of your DynamoDB table" [2], so the type was chosen before the table held any data. A second region can later be added as a replica without replacing the table.
-- A replaced table would be a new, empty table. So the table has deletion protection, a retain policy, and a fixed logical ID, and its stack has termination protection. Its name is fixed (`cv-tailor-<env>-data`), so a change that needs a replacement fails instead of creating an empty table.
-- Other stacks find the table by its fixed name, not through a CloudFormation export, so no export ties a stack to `<env>-Data`.
+- The table is defined in OpenTofu, in the workload stack (`infra/modules/data`). Point-in-time recovery is on, because the table holds user data.
+- Until S3-15, the table was an `AWS::DynamoDB::GlobalTable` with one replica in `us-east-1` (CDK's `TableV2` [3]), because CloudFormation can't change an `AWS::DynamoDB::Table` into a `GlobalTable` in place, and trying "might result in the deletion of your DynamoDB table" [2]. Since S3-15 it's an OpenTofu `aws_dynamodb_table`, which adds a replica region to an existing table in place, so a second region still needs no replacement. The table was created again in the move, while `dev` held only test data ([ADR-0013](0013-infrastructure-as-code-opentofu.md) §10).
+- A replaced table would be a new, empty table. So the table has deletion protection and `prevent_destroy`. Its name is fixed (`cv-tailor-<env>-data`), so a change that needs a replacement fails instead of creating an empty table.
+- The API's functions find the table by its fixed name.
 
 ## Consequences
 
@@ -134,7 +134,7 @@ Rejected, because it fails driver 2. The managed knowledge base ([ADR-0007](0007
 
 ## Verification
 
-1. `cdk synth` shows exactly one DynamoDB table per environment: an `AWS::DynamoDB::GlobalTable` with `BillingMode: PAY_PER_REQUEST` and TTL on `expiresAt`, and one replica, in `us-east-1`, with point-in-time recovery and deletion protection on.
+1. `tofu test` shows exactly one DynamoDB table per environment, with `PAY_PER_REQUEST` billing, TTL on `expiresAt`, no replica outside `us-east-1`, and point-in-time recovery and deletion protection on.
 2. A test for the quota counter shows that two concurrent updates that together pass the limit result in one success and one `ConditionalCheckFailedException`.
 3. A test for account deletion shows that every item under `USER#<sub>` is removed and items of other users are not.
 4. A daily counter item carries `expiresAt` set to the end of its UTC day.

@@ -1,11 +1,12 @@
 # ADR-0001: Monorepo with pnpm Workspaces
 
-| Field       | Value         |
-| ----------- | ------------- |
-| Status      | Accepted      |
-| Date        | 2026-09-27    |
-| Deciders    | Project owner |
-| Sprint item | S0-02         |
+| Field       | Value                                                                                                                                                      |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status      | Accepted                                                                                                                                                   |
+| Date        | 2026-09-27                                                                                                                                                 |
+| Deciders    | Project owner                                                                                                                                              |
+| Sprint item | S0-02                                                                                                                                                      |
+| Amended     | 2026-10-07: `infra` is OpenTofu, run through a `package.json` wrapper like the Python service (S3-15, [ADR-0013](0013-infrastructure-as-code-opentofu.md)) |
 
 ## Context
 
@@ -16,12 +17,12 @@ CV Tailor has four deployable or buildable parts, in two languages:
 | Web SPA (`apps/web`)              | TypeScript  | pnpm, Vite, Vitest     |
 | API Lambdas (`apps/api`)          | TypeScript  | pnpm, Vitest           |
 | Agent service (`services/agents`) | Python 3.12 | uv, pytest, ruff, mypy |
-| Infrastructure (`infra`)          | TypeScript  | pnpm, AWS CDK          |
+| Infrastructure (`infra`)          | HCL         | pnpm wrapper, OpenTofu |
 
 These parts are tightly coupled:
 
 - The API and the agents exchange payloads. Both sides must agree on the same shape, or calls fail at runtime.
-- The CDK app deploys the API, the web app, and the agents together, per environment.
+- The OpenTofu workload stack deploys the API, the web app, and the agents together, per environment ([ADR-0013](0013-infrastructure-as-code-opentofu.md)).
 - A single feature (for example GEN-04, async generation) usually changes the API, the agents, the contracts, and the infrastructure at the same time.
 
 The project has one developer, a low user volume, and a goal of long-term maintainability. The repository is also a public portfolio, so a reviewer should be able to understand the whole system from one place.
@@ -124,7 +125,7 @@ Use **a single monorepo** with **pnpm workspaces** and pnpm's built-in task orch
 
 Details:
 
-- **Layout.** `apps/` holds the TypeScript deployables, `packages/` holds shared code, `services/` holds the Python agent service, and `infra/` holds the CDK app. The full tree is in the [Sprint 0 plan](../sprints/sprint-00-foundation.md#target-repository-structure).
+- **Layout.** `apps/` holds the TypeScript deployables, `packages/` holds shared code, `services/` holds the Python agent service, and `infra/` holds the OpenTofu stacks and modules. The full tree is in the [Sprint 0 plan](../sprints/sprint-00-foundation.md#target-repository-structure).
 - **Workspace config.** `pnpm-workspace.yaml` lists the packages (`apps/*`, `packages/*`, `services/*`, `infra`) and declares task dependencies in a `tasks` block.
 - **Python integration.** `services/agents` has a thin `package.json` whose scripts call `uv run`, so pnpm runs Python tasks together with the TypeScript tasks. uv remains the only owner of Python dependencies.
 - **Contracts.** `packages/contracts` is the single source of truth for payloads. Generated files are committed, and CI fails if they are out of date. The source format and codegen tools are decided in [ADR-0003](0003-contracts-codegen.md): Zod schemas, with JSON Schema and Pydantic generated from them.

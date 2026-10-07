@@ -14,7 +14,7 @@ export interface Caller {
 // A REST API passes every claim as a string, so the token's cognito:groups array arrives
 // flattened. AWS doesn't document the format: reports show "admin,editors", and older ones
 // "[admin editors]". Both are accepted, and an array too, in case the format changes. Cognito
-// group names can't contain whitespace, and our groups (defined only in CDK) have no commas.
+// group names can't contain whitespace, and our groups (defined only in OpenTofu) have no commas.
 export function parseGroups(value: unknown): string[] {
   if (Array.isArray(value)) {
     return value.filter((group): group is string => typeof group === 'string');

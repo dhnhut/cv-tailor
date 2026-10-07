@@ -284,35 +284,19 @@ importers:
         version: 5.0.2(@types/node@24.19.0)(@vitest/coverage-v8@5.0.2)(jsdom@30.1.1)(vite@8.3.1(@types/node@24.19.0)(jiti@2.7.0))
 
   infra:
-    dependencies:
-      aws-cdk-lib:
-        specifier: ^2.271.0
-        version: 2.271.0(constructs@10.8.1)
-      constructs:
-        specifier: ^10.8.0
-        version: 10.8.1
     devDependencies:
-      '@cv-tailor/api':
-        specifier: workspace:*
-        version: link:../apps/api
       '@cv-tailor/config':
         specifier: workspace:*
         version: link:../packages/config
       '@cv-tailor/contracts':
         specifier: workspace:*
         version: link:../packages/contracts
-      '@cv-tailor/web':
-        specifier: workspace:*
-        version: link:../apps/web
       '@types/node':
         specifier: ^24.19.0
         version: 24.19.0
       '@vitest/coverage-v8':
         specifier: 5.0.2
         version: 5.0.2(vitest@5.0.2)
-      aws-cdk:
-        specifier: ^2.1143.0
-        version: 2.1143.0
       eslint:
         specifier: ^10.11.0
         version: 10.11.0(jiti@2.7.0)
@@ -394,19 +378,6 @@ packages:
   '@asamuzakjp/dom-selector@9.2.1':
     resolution: {integrity: sha512-NT4s3yZLjovPpliRpTvdsdzyPjqRqiCZj9MxnarBihbaY5MbAG7DWAJcrLlhmC7xKTNCXsTELcqB8YsqpLnUFQ==}
     engines: {node: ^22.22.2 || ^24.15.0 || >=26.0.0}
-
-  '@aws-cdk/asset-awscli-v1@2.2.292':
-    resolution: {integrity: sha512-d4aMFsAFj19FtxVyw8IzlUKv5Zu4sIvgnEjI2IU6IWBJgVbJ4aFnadANqYa+6MwB1CQbGOg0jh8WE77M+Nb/9A==}
-
-  '@aws-cdk/asset-node-proxy-agent-v6@2.1.3':
-    resolution: {integrity: sha512-98We1QWfin9vtuuQtNFhIIAEWb8CreyYTAP0Vn8HqSBoNiFJM9nZgifJeQawT9Wq0NX1HCNFlxCyTccIrK1PSA==}
-
-  '@aws-cdk/cloud-assembly-schema@54.25.0':
-    resolution: {integrity: sha512-aZkzPqWLg1Oozm53NeyrBZPguTq3e6v7NpQ3QOGULj0IIrodLzGPM7fmAvjcJcHzjtuZU9IP1gIY92nKIM+Bvw==}
-    engines: {node: '>= 18.0.0'}
-    bundledDependencies:
-      - jsonschema
-      - semver
 
   '@aws-sdk/checksums@3.1001.1':
     resolution: {integrity: sha512-x12Q17KYlJAd3nKf8LV5LV0vt8sh8/6YfQLGPtrGnQf/tW4jqxPGq5GPpuVitpQYM3eUR4XB7CbxZf751NMbLw==}
@@ -1239,30 +1210,6 @@ packages:
   ast-v8-to-istanbul@1.0.7:
     resolution: {integrity: sha512-kFL68AG6ajd8fg248zwM9GQrUWEp79gsmjum34OEXjs4yHuUMZfYKwOLW9GMmB4oNvVrj+EAGxsP7ye2UR9UlA==}
 
-  aws-cdk-lib@2.271.0:
-    resolution: {integrity: sha512-VdLda/mCneNUZkfKIYiTYSCbDdGaTmH9uhfGs5TYIfvIqKuyUcZK6S7+LaF+pRhkNnbTGgKqvCqRIMemZOvCnA==}
-    engines: {node: '>= 20.0.0'}
-    peerDependencies:
-      constructs: ^10.5.0
-    bundledDependencies:
-      - '@aws/cloudformation-validate'
-      - '@balena/dockerignore'
-      - '@aws-cdk/cloud-assembly-api'
-      - case
-      - fs-extra
-      - ignore
-      - jsonschema
-      - minimatch
-      - punycode
-      - semver
-      - yaml
-      - mime-types
-
-  aws-cdk@2.1143.0:
-    resolution: {integrity: sha512-bTbgEmNuN6UMDAyhGFWOAnriafSu7j0cAjaFKRw1/WEs6RE5g062D2v2+YE8Dw6qw7RgNGQPH5Nv47TsK5kZSQ==}
-    engines: {node: '>= 18.0.0'}
-    hasBin: true
-
   balanced-match@4.0.4:
     resolution: {integrity: sha512-BLrgEcRTwX2o6gGxGOCNyMvGSp35YofuYzw9h1IMTRmKqttAZZVU67bdb9Pr2vUHA8+j3i2tJfjO6C6+4myGTA==}
     engines: {node: 18 || 20 || >=22}
@@ -1283,9 +1230,6 @@ packages:
   chai@6.2.2:
     resolution: {integrity: sha512-NUPRluOfOiTKBKvWPtSD4PhFvWCqOi0BGStNWs57X9js7XGTprSmFoz5F0tWhR4WPjNeR9jXqdC7/UpSJTnlRg==}
     engines: {node: '>=18'}
-
-  constructs@10.8.1:
-    resolution: {integrity: sha512-98yGXYyhePqPYh3cYu8nzBERmAhC0DONe3UD03okK0nehZ7hYP4wgZuf02a04+uOWxnTJ5Rpp5m0GRNpwyLGGA==}
 
   cookie-es@3.1.1:
     resolution: {integrity: sha512-UaXxwISYJPTr9hwQxMFYZ7kNhSXboMXP+Z3TRX6f1/NyaGPfuNUZOWP1pUEb75B2HjfklIYLVRfWiFZJyC6Npg==}
@@ -2071,12 +2015,6 @@ snapshots:
       css-tree: 3.2.1
       is-potential-custom-element-name: 1.0.1
       lru-cache: 11.5.3
-
-  '@aws-cdk/asset-awscli-v1@2.2.292': {}
-
-  '@aws-cdk/asset-node-proxy-agent-v6@2.1.3': {}
-
-  '@aws-cdk/cloud-assembly-schema@54.25.0': {}
 
   '@aws-sdk/checksums@3.1001.1':
     dependencies:
@@ -2872,15 +2810,6 @@ snapshots:
       estree-walker: 3.0.3
       js-tokens: 10.0.0
 
-  aws-cdk-lib@2.271.0(constructs@10.8.1):
-    dependencies:
-      '@aws-cdk/asset-awscli-v1': 2.2.292
-      '@aws-cdk/asset-node-proxy-agent-v6': 2.1.3
-      '@aws-cdk/cloud-assembly-schema': 54.25.0
-      constructs: 10.8.1
-
-  aws-cdk@2.1143.0: {}
-
   balanced-match@4.0.4: {}
 
   bidi-js@1.1.0:
@@ -2902,8 +2831,6 @@ snapshots:
       qified: 0.10.1
 
   chai@6.2.2: {}
-
-  constructs@10.8.1: {}
 
   cookie-es@3.1.1: {}
 

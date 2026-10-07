@@ -12,7 +12,7 @@ An AI application that writes a tailored CV and cover letter for a specific job,
 | Backend   | Node.js 24, TypeScript, AWS Lambda, API Gateway             |
 | AI agents | Python 3.12, LangChain, LangGraph on Bedrock AgentCore      |
 | Data      | DynamoDB, S3, Cognito                                       |
-| Infra     | AWS CDK, deployed by GitHub Actions, region `us-east-1`     |
+| Infra     | OpenTofu, deployed by GitHub Actions, region `us-east-1`    |
 
 The full scope, agent design, safety requirements, and architecture are in [`AGENTS.md`](AGENTS.md).
 
@@ -24,7 +24,7 @@ apps/api/            Lambda handlers
 services/agents/     Python agent service (uv)
 packages/contracts/  Zod contracts → JSON Schema → Pydantic
 packages/config/     Shared ESLint, tsconfig, and Prettier config
-infra/               CDK app
+infra/               OpenTofu stacks and modules
 docs/                ADRs, sprints, cloud report, runbooks
 scripts/             Repo scripts
 ```
