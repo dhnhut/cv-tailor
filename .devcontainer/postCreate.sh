@@ -10,6 +10,9 @@ corepack prepare pnpm@12.5.1 --activate
 echo "==> Installing uv"
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
+echo "==> Installing OpenTofu, TFLint, and Trivy"
+bash .devcontainer/install-iac-tools.sh
+
 echo "==> Tool versions"
 node -v
 pnpm -v

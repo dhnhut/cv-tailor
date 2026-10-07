@@ -1,0 +1,3 @@
+# Trivy findings that are accepted, each with its reason (ADR-0013 §9). Read by scripts/lint-tofu.sh.
+# Format: https://trivy.dev/latest/docs/configuration/filtering/#trivyignoreyaml
+misconfigurations: []
