@@ -189,21 +189,21 @@ An **evaluation benchmark** is required. It measures output quality and checks t
 
 ## 7. Architecture
 
-| Layer                  | Technology                                                                                                                                                                                                  |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Frontend               | Vite, React, TypeScript SPA, Tailwind CSS, served via CloudFront                                                                                                                                            |
-| API                    | AWS API Gateway REST API, with a Cognito authorizer that accepts access tokens only ([ADR-0009](docs/adr/0009-sign-in-and-api-access.md))                                                                   |
-| Backend                | Node.js 24, TypeScript, AWS Lambda (serverless)                                                                                                                                                             |
-| Database               | Amazon DynamoDB, a single table with an `Entity` attribute ([ADR-0006](docs/adr/0006-data-store.md))                                                                                                        |
-| File storage           | Amazon S3 (direct upload)                                                                                                                                                                                   |
-| Auth                   | Amazon Cognito (Essentials plan): managed login, email/password and Google sign-in with account linking, authorization code flow with PKCE ([ADR-0009](docs/adr/0009-sign-in-and-api-access.md))            |
-| AI agents              | Python 3.12, LangChain, LangGraph on Bedrock AgentCore                                                                                                                                                      |
-| Infrastructure as Code | AWS CDK                                                                                                                                                                                                     |
-| CI/CD                  | GitHub Actions (actions pinned to commit SHAs, updated by Dependabot)                                                                                                                                       |
-| Package managers       | pnpm (via Corepack) for TypeScript, uv for Python                                                                                                                                                           |
-| Repository             | Monorepo: pnpm workspaces with pnpm's built-in task orchestration, plus a `package.json` wrapper so pnpm can run the Python service's tasks ([ADR-0001](docs/adr/0001-monorepo-pnpm-workspaces.md))         |
-| Contracts              | Zod schemas are the single source of truth for API ↔ agent payloads. JSON Schema and Pydantic models are generated from them, committed, and checked in CI ([ADR-0003](docs/adr/0003-contracts-codegen.md)) |
-| Secrets                | SSM Parameter Store; Secrets Manager when needed                                                                                                                                                            |
+| Layer                  | Technology                                                                                                                                                                                                                  |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Frontend               | Vite, React, TypeScript SPA, Tailwind CSS, served via CloudFront                                                                                                                                                            |
+| API                    | AWS API Gateway REST API, with a Cognito authorizer that accepts access tokens only ([ADR-0009](docs/adr/0009-sign-in-and-api-access.md))                                                                                   |
+| Backend                | Node.js 24, TypeScript, AWS Lambda (serverless)                                                                                                                                                                             |
+| Database               | Amazon DynamoDB, a single table with an `Entity` attribute ([ADR-0006](docs/adr/0006-data-store.md))                                                                                                                        |
+| File storage           | Amazon S3 (direct upload)                                                                                                                                                                                                   |
+| Auth                   | Amazon Cognito (Essentials plan): managed login, email/password and Google sign-in with account linking, authorization code flow with PKCE ([ADR-0009](docs/adr/0009-sign-in-and-api-access.md))                            |
+| AI agents              | Python 3.12, LangChain, LangGraph on Bedrock AgentCore                                                                                                                                                                      |
+| Infrastructure as Code | OpenTofu (HCL), with encrypted remote state per environment and stack ([ADR-0013](docs/adr/0013-infrastructure-as-code-opentofu.md))                                                                                        |
+| CI/CD                  | GitHub Actions (actions pinned to commit SHAs, updated by Dependabot)                                                                                                                                                       |
+| Package managers       | pnpm (via Corepack) for TypeScript, uv for Python                                                                                                                                                                           |
+| Repository             | Monorepo: pnpm workspaces with pnpm's built-in task orchestration, plus `package.json` wrappers so pnpm can run the Python service's and the infrastructure's tasks ([ADR-0001](docs/adr/0001-monorepo-pnpm-workspaces.md)) |
+| Contracts              | Zod schemas are the single source of truth for API ↔ agent payloads. JSON Schema and Pydantic models are generated from them, committed, and checked in CI ([ADR-0003](docs/adr/0003-contracts-codegen.md))                 |
+| Secrets                | SSM Parameter Store; Secrets Manager when needed                                                                                                                                                                            |
 
 **Backend-to-agent communication:** synchronous for chat, asynchronous for long-running generation.
 
@@ -227,13 +227,13 @@ The system must resist abuse, such as someone creating many free accounts to col
 
 ## 9. Non-Functional Requirements
 
-| Area          | Target                                                                           |
-| ------------- | -------------------------------------------------------------------------------- |
-| Availability  | 99.9% in production                                                              |
-| Scale         | Low user volume (portfolio stage)                                                |
-| Reliability   | Production-grade behaviour, with errors handled and observable                   |
-| Test coverage | 80% minimum per package (lines, statements, functions, branches), enforced in CI |
-| User focus    | New Zealand and Australia, served from `us-east-1` (see §10)                     |
+| Area          | Target                                                                                                                                                                     |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Availability  | 99.9% in production                                                                                                                                                        |
+| Scale         | Low user volume (portfolio stage)                                                                                                                                          |
+| Reliability   | Production-grade behaviour, with errors handled and observable                                                                                                             |
+| Test coverage | 80% minimum per TypeScript and Python package (lines, statements, functions, branches), enforced in CI. Infrastructure is checked with `tofu test`, `tflint`, and `trivy`. |
+| User focus    | New Zealand and Australia, served from `us-east-1` (see §10)                                                                                                               |
 
 ---
 
@@ -246,7 +246,7 @@ The system must resist abuse, such as someone creating many free accounts to col
 | Guardrails     | Service control policies and an organization CloudTrail trail ([ADR-0004](docs/adr/0004-accounts-and-access.md))                                                                             |
 | Region         | Single region, `us-east-1`, for every environment ([ADR-0002](docs/adr/0002-aws-region.md))                                                                                                  |
 | Domain         | `cv.ikiwii.com` (`prod`), `stag.cv.ikiwii.com`, and `dev.cv.ikiwii.com`, each a Route 53 zone in its own account, delegated from the registrar ([ADR-0008](docs/adr/0008-domain-and-dns.md)) |
-| Deployment     | AWS CDK through GitHub Actions                                                                                                                                                               |
+| Deployment     | OpenTofu through GitHub Actions                                                                                                                                                              |
 | Process        | Lightweight Agile/Scrum in small sprints                                                                                                                                                     |
 | Sprint docs    | `docs/sprints/`                                                                                                                                                                              |
 
