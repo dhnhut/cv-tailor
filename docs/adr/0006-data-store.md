@@ -1,12 +1,12 @@
 # ADR-0006: Data Store, a Single DynamoDB Table
 
-| Field       | Value                                                                                                                                                                                                                                                           |
-| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Status      | Accepted                                                                                                                                                                                                                                                        |
-| Date        | 2026-10-01                                                                                                                                                                                                                                                      |
-| Amended     | 2026-10-03: the table's resource type, its guards against replacement, and UTC quota periods are recorded, and verification steps 1 and 4 are updated (S2-08); 2026-10-06: document and job IDs are lowercase UUID v7, and verification step 5 is added (S3-03) |
-| Deciders    | Project owner                                                                                                                                                                                                                                                   |
-| Sprint item | S1-13                                                                                                                                                                                                                                                           |
+| Field       | Value                                                                                                                                                                                                                                                                                                                                                     |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status      | Accepted                                                                                                                                                                                                                                                                                                                                                  |
+| Date        | 2026-10-01                                                                                                                                                                                                                                                                                                                                                |
+| Amended     | 2026-10-03: the table's resource type, its guards against replacement, and UTC quota periods are recorded, and verification steps 1 and 4 are updated (S2-08); 2026-10-06: document and job IDs are lowercase UUID v7, and verification step 5 is added (S3-03); 2026-10-07: the `StorageUsage` item and the `KbDocument` attributes are recorded (S3-07) |
+| Deciders    | Project owner                                                                                                                                                                                                                                                                                                                                             |
+| Sprint item | S1-13                                                                                                                                                                                                                                                                                                                                                     |
 
 ## Context
 
@@ -81,6 +81,7 @@ Rejected, because it fails driver 2. The managed knowledge base ([ADR-0007](0007
 | Monthly counter | `USER#<sub>` | `QUOTA#MONTH#<month>` | `QuotaCounter`  | `expiresAt` after the UTC month ends              |
 | KB document     | `USER#<sub>` | `DOC#<id>`            | `KbDocument`    | Metadata only; the file is in S3                  |
 | Generation job  | `USER#<sub>` | `JOB#<id>`            | `GenerationJob` |                                                   |
+| Storage usage   | `USER#<sub>` | `STORAGE`             | `StorageUsage`  | `usedBytes` and `documentCount` (KB-06, S3-07)    |
 
 ### IDs for documents and jobs
 
@@ -89,6 +90,12 @@ Rejected, because it fails driver 2. The managed knowledge base ([ADR-0007](0007
 - **Why time-ordered:** the first 48 bits are the creation time in Unix milliseconds [5], written as fixed-width lowercase hex. DynamoDB sorts a string sort key by its bytes, so `DOC#` and `JOB#` keys sort by creation time. A query on `begins_with(SK, 'JOB#')` with `ScanIndexForward: false` lists a user's jobs newest first, with no index and no sort in code.
 - **Options rejected:** UUID v4 is built in but random, so listing newest first would need a sort in code or an index. A ULID is time-ordered but needs a dependency and has no standard library support.
 - **Limits:** the order is to the millisecond only. Node fills the bits after the timestamp at random, with no counter, so two IDs from the same millisecond are in random order. Order across Lambda instances depends on their clocks. An ID reveals when its item was created. That is acceptable because only the owner sees these IDs, and they see `createdAt` anyway. Public IDs (chatbot page, coupon) are decided with those features.
+
+### Knowledge base documents and storage usage (S3-07)
+
+- A `KbDocument` item holds `name` (the file name, shown only to its owner), `type`, `size`, `sha256` (lowercase hex), `objectKey` (its S3 key), `uploadState` (`RESERVED` until the file is in S3, then `UPLOADED`), `uploadDeadline`, and `createdAt`.
+- The `StorageUsage` item counts the bytes and documents a user has stored or reserved. `POST /documents` adds to it and writes the document item in one `TransactWriteItems`, with a `ConditionExpression` that refuses an upload that would pass 50,000,000 bytes or 100 documents. Two uploads at once can't both pass the cap, and the count can't drift from the items.
+- A delete, or the release of an upload that never arrived, removes the item and subtracts its bytes in one transaction. The delete's condition makes the second of two racing requests change nothing, so bytes are never freed twice.
 
 ### Access
 

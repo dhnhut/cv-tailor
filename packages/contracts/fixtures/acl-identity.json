@@ -1,0 +1,20 @@
+{
+  "domain": "users.cv-tailor.invalid",
+  "cases": [
+    {
+      "sub": "4f1c2b3a-9d8e-4f7a-b6c5-1a2b3c4d5e6f",
+      "identity": "4f1c2b3a-9d8e-4f7a-b6c5-1a2b3c4d5e6f@users.cv-tailor.invalid"
+    },
+    {
+      "sub": "0f8fad5b-d9cb-469f-a165-70867728950e",
+      "identity": "0f8fad5b-d9cb-469f-a165-70867728950e@users.cv-tailor.invalid"
+    }
+  ],
+  "refused": [
+    "",
+    "4F1C2B3A-9D8E-4F7A-B6C5-1A2B3C4D5E6F",
+    "alice@example.com",
+    " 4f1c2b3a-9d8e-4f7a-b6c5-1a2b3c4d5e6f",
+    "4f1c2b3a-9d8e-4f7a-b6c5-1a2b3c4d5e6f\n"
+  ]
+}

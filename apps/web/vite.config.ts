@@ -16,6 +16,14 @@ export default defineConfig({
       // The API, called from localhost through this server: a server-to-server call has no CORS, so
       // dev's CORS can stay limited to the deployed web app (S2-09). Each API path is listed.
       '/me': { target: 'https://api.dev.cv.ikiwii.com', changeOrigin: true },
+      // GET and POST /documents, and DELETE /documents/{id}: a key matches by prefix. The web app's
+      // own /documents page (S3-09) has the same path, so a page load (Accept: text/html) is
+      // served by Vite, not sent to the API.
+      '/documents': {
+        target: 'https://api.dev.cv.ikiwii.com',
+        changeOrigin: true,
+        bypass: (req) => (req.headers.accept?.includes('text/html') ? req.url : undefined),
+      },
     },
   },
   test: {

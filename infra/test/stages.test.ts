@@ -186,14 +186,17 @@ test.each(CONFIGS)('the $name environment has exactly one data table (ADR-0006)'
 });
 
 // The API reads the pool ID from SSM and finds the table by name, which CDK can't see (S2-09).
-test.each(CONFIGS)('the $name API deploys after its auth and data stacks', (config) => {
-  const { stacks } = synthStage(config.name);
-  const stack = (name: string) => stacks.find((s) => s.stackName === `${config.name}-${name}`);
+test.each(CONFIGS)(
+  'the $name API deploys after its auth, data, and knowledge base stacks',
+  (config) => {
+    const { stacks } = synthStage(config.name);
+    const stack = (name: string) => stacks.find((s) => s.stackName === `${config.name}-${name}`);
 
-  expect(stack('Api')?.dependencies.map((d) => d.id)).toEqual(
-    expect.arrayContaining([stack('Auth')?.id, stack('Data')?.id]),
-  );
-});
+    expect(stack('Api')?.dependencies.map((d) => d.id)).toEqual(
+      expect.arrayContaining([stack('Auth')?.id, stack('Data')?.id, stack('KnowledgeBase')?.id]),
+    );
+  },
+);
 
 // S2-09: CORS allows the deployed web app only. localhost signs in to dev (ADR-0009 §5), but
 // can't call the API directly; S2-10 gives the dev server a proxy instead.

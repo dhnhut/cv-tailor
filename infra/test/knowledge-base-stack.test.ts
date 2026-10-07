@@ -73,7 +73,7 @@ describe('Knowledge base stack', () => {
           CorsRules: [
             {
               AllowedOrigins: ['https://dev.cv.ikiwii.com'],
-              AllowedMethods: ['POST', 'PUT'],
+              AllowedMethods: ['PUT'],
               AllowedHeaders: ['content-type', 'x-amz-checksum-sha256'],
               MaxAge: 3600,
             },

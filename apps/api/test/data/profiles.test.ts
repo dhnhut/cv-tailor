@@ -1,10 +1,7 @@
-import {
-  ConditionalCheckFailedException,
-  GetItemCommand,
-  PutItemCommand,
-} from '@aws-sdk/client-dynamodb';
-import { describe, expect, test, vi } from 'vitest';
+import { GetItemCommand, PutItemCommand } from '@aws-sdk/client-dynamodb';
+import { describe, expect, test } from 'vitest';
 import { dynamoProfileStore } from '../../src/data/profiles.ts';
+import { conditionFailed, expectCommands, fakeSend } from '../aws-fakes.ts';
 
 // The exact DynamoDB requests GET /me sends (S2-09). The IAM policy in infra/lib/api-stack.ts
 // allows GetItem and PutItem only, so a new command here needs a policy change too. Inputs are
@@ -28,35 +25,9 @@ const PUT_INPUT = {
   ExpressionAttributeNames: { '#pk': 'PK' },
 };
 
-// What DynamoDB throws when the condition fails.
-const conditionFailed = () =>
-  new ConditionalCheckFailedException({
-    message: 'The conditional request failed',
-    $metadata: {},
-  });
-
-// send answers each call in turn: an Error rejects, anything else resolves.
 const setup = (...responses: unknown[]) => {
-  const send = vi.fn<(command: unknown) => Promise<unknown>>();
-  for (const response of responses) {
-    if (response instanceof Error) send.mockRejectedValueOnce(response);
-    else send.mockResolvedValueOnce(response);
-  }
+  const send = fakeSend(...responses);
   return { send, store: dynamoProfileStore({ send }, TABLE) };
-};
-
-// The commands sent, in order: each one's class and its exact input.
-type CommandClass = abstract new (...args: never[]) => { input: unknown };
-const expectCommands = (
-  send: ReturnType<typeof setup>['send'],
-  ...expected: [CommandClass, unknown][]
-) => {
-  expect(send).toHaveBeenCalledTimes(expected.length);
-  expected.forEach(([type, input], index) => {
-    const command = send.mock.calls[index]?.[0];
-    expect(command).toBeInstanceOf(type);
-    expect((command as { input: unknown }).input).toEqual(input);
-  });
 };
 
 describe('ensureProfile', () => {
