@@ -31,6 +31,11 @@ resource "aws_route53_record" "validation" {
   type    = local.validation.resource_record_type
   ttl     = 300
   records = [local.validation.resource_record_value]
+
+  # ACM gives every certificate for the same domain in the same account the same CNAME, so an
+  # earlier certificate may have created this record already (CDK's did, S3-15). Take it over
+  # instead of failing. Its name is ACM's random token, so nothing else can share it.
+  allow_overwrite = true
 }
 
 # Waits until ACM has issued the certificate, usually a few minutes.

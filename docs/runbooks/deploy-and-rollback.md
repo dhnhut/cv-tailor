@@ -97,12 +97,21 @@ aws iam simulate-principal-policy --policy-source-arn "arn:aws:iam::$ACCOUNT:rol
 aws iam simulate-principal-policy --policy-source-arn "arn:aws:iam::$ACCOUNT:role/GithubDeployRole" \
   --action-names ssm:PutParameter --resource-arns "arn:aws:ssm:us-east-1:$ACCOUNT:parameter/cv-tailor/ai-calls" \
   --query 'EvaluationResults[].[EvalActionName,EvalDecision]' --output table
+# What CI needs: its own state, and the workload's resources.
+aws iam simulate-principal-policy --policy-source-arn "arn:aws:iam::$ACCOUNT:role/GithubDeployRole" \
+  --action-names s3:GetObject s3:PutObject \
+  --resource-arns "arn:aws:s3:::cv-tailor-tfstate-$ACCOUNT/dev/workload.tfstate" \
+  --query 'EvaluationResults[].[EvalActionName,EvalDecision]' --output table
+aws iam simulate-principal-policy --policy-source-arn "arn:aws:iam::$ACCOUNT:role/GithubDeployRole" \
+  --action-names lambda:CreateFunction --resource-arns "arn:aws:lambda:us-east-1:$ACCOUNT:function:cv-tailor-dev-me" \
+  --query 'EvaluationResults[].[EvalActionName,EvalDecision]' --output table
 ```
 
 Expected:
 
 - `aud` is `sts.amazonaws.com`, and `sub` is exactly `repo:dhnhut@5567608/cv-tailor@1386961484:environment:dev`. This is GitHub's immutable subject format, which includes the owner and repository IDs. A `sub` without the `@<id>` parts never matches, and the job fails at the credentials step.
-- Every decision is `explicitDeny`. `iam:CreateRole` is denied because the simulation names no permissions boundary.
+- The first two tables: every decision is `explicitDeny`. `iam:CreateRole` is denied because the simulation names no permissions boundary.
+- The last two tables: every decision is `allowed`, so the role isn't locked out of its own job.
 
 ### DNS zones and certificates (`dns`)
 
@@ -353,7 +362,10 @@ The stacks keep (retain) the user pool, the data table, and the documents bucket
 
 ```bash
 P=(--profile cvt-dev)
-aws cognito-idp update-user-pool --user-pool-id "$DEV_POOL" --deletion-protection INACTIVE "${P[@]}"
+# update-user-pool resets every setting it isn't given, and Cognito refuses a pool that keeps the
+# old email until the new one is verified without auto-verifying email. So email goes along.
+aws cognito-idp update-user-pool --user-pool-id "$DEV_POOL" --deletion-protection INACTIVE \
+  --auto-verified-attributes email "${P[@]}"
 aws cognito-idp delete-user-pool --user-pool-id "$DEV_POOL" "${P[@]}"
 
 aws dynamodb update-table --table-name cv-tailor-dev-data --no-deletion-protection-enabled "${P[@]}" >/dev/null
@@ -420,7 +432,7 @@ AWS_PROFILE=cvt-dev infra/scripts/tofu.sh dev dns plan
 AWS_PROFILE=cvt-dev infra/scripts/tofu.sh dev dns apply
 ```
 
-The old certificate's validation `CNAME` stays in the `dev` zone. It's harmless, and can be deleted in the console.
+The new certificate uses the same validation `CNAME` as the old one: ACM gives every certificate for the same domain in the same account the same record. CloudFormation left that record in the zone, and the apply takes it over (`allow_overwrite`), so ACM may issue the new certificate at once.
 
 ### 7.6 Apply the dev workload
 
