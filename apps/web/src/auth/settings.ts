@@ -1,7 +1,7 @@
 import type { WebConfig } from '@cv-tailor/contracts';
 import { type UserManagerSettings, WebStorageStateStore } from 'oidc-client-ts';
 
-// Must match SIGN_IN_CALLBACK_PATH and SIGN_OUT_PATH in infra/lib/auth-stack.ts: Cognito accepts
+// Must match sign_in_callback_path and sign_out_path in infra/modules/auth/variables.tf: Cognito accepts
 // only the exact URLs registered on the app client.
 export const CALLBACK_PATH = '/auth/callback';
 export const SIGN_OUT_PATH = '/';

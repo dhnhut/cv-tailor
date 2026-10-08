@@ -97,6 +97,10 @@ aws iam simulate-principal-policy --policy-source-arn "arn:aws:iam::$ACCOUNT:rol
 aws iam simulate-principal-policy --policy-source-arn "arn:aws:iam::$ACCOUNT:role/GithubDeployRole" \
   --action-names ssm:PutParameter --resource-arns "arn:aws:ssm:us-east-1:$ACCOUNT:parameter/cv-tailor/ai-calls" \
   --query 'EvaluationResults[].[EvalActionName,EvalDecision]' --output table
+# Name a real function: simulated against *, the allow doesn't match, and the answer is only implicitDeny.
+aws iam simulate-principal-policy --policy-source-arn "arn:aws:iam::$ACCOUNT:role/GithubDeployRole" \
+  --action-names lambda:InvokeFunction --resource-arns "arn:aws:lambda:us-east-1:$ACCOUNT:function:cv-tailor-dev-me" \
+  --query 'EvaluationResults[].[EvalActionName,EvalDecision]' --output table
 # What CI needs: its own state, and the workload's resources.
 aws iam simulate-principal-policy --policy-source-arn "arn:aws:iam::$ACCOUNT:role/GithubDeployRole" \
   --action-names s3:GetObject s3:PutObject \
@@ -110,7 +114,7 @@ aws iam simulate-principal-policy --policy-source-arn "arn:aws:iam::$ACCOUNT:rol
 Expected:
 
 - `aud` is `sts.amazonaws.com`, and `sub` is exactly `repo:dhnhut@5567608/cv-tailor@1386961484:environment:dev`. This is GitHub's immutable subject format, which includes the owner and repository IDs. A `sub` without the `@<id>` parts never matches, and the job fails at the credentials step.
-- The first two tables: every decision is `explicitDeny`. `iam:CreateRole` is denied because the simulation names no permissions boundary.
+- The first three tables: every decision is `explicitDeny`. `iam:CreateRole` is denied because the simulation names no permissions boundary.
 - The last two tables: every decision is `allowed`, so the role isn't locked out of its own job.
 
 ### DNS zones and certificates (`dns`)
@@ -304,6 +308,8 @@ Use this when items were deleted or overwritten by mistake, for example by a bug
 If the whole table was deleted (deletion protection makes this unlikely), DynamoDB keeps a system backup, `cv-tailor-<env>-data$DeletedTableBackup`, for 35 days. Restore it under the original name. OpenTofu finds a table by its name, so the next workload plan picks up the restored table. It doesn't copy TTL, PITR, deletion protection, or tags, and the plan turns those back on in place. Read that plan first: it must not replace the table.
 
 ## 7. Move from CDK (once, S3-15)
+
+**Done on 2026-10-07.** Kept as a record, and as the order to follow for a similar move. The steps below include the fixes found while running them.
 
 The one-time move from the CDK app to OpenTofu ([ADR-0013](../adr/0013-infrastructure-as-code-opentofu.md) §10). Every resource CloudFormation manages is created again by OpenTofu, except the two hosted zones, which are imported, so their name servers don't change. `dev` holds only test data, and its users, documents, and table items are lost.
 
@@ -510,5 +516,5 @@ Expected: `[]` for every account (no CloudFormation stacks left), `0` (the state
 - `CVT_<ENV>_ACCOUNT_ID must be a 12-digit account ID`: `infra/.env` is missing or incomplete.
 - `AWS account ID not allowed`: `AWS_PROFILE` belongs to another environment's account. Set it to `cvt-<env>` for the environment you named.
 - `Usage: …/tofu.sh`: the environment or stack name is wrong. The stacks are `bootstrap`, `access`, `baseline`, `dns`, and `workload`.
-- `Instance cannot be destroyed` with `prevent_destroy`: the plan would replace or destroy a protected resource. Don't remove the guard. Find which change forces a replacement (the plan marks it `# forces replacement`), and change the code so it doesn't.
+- `Resource instance cannot be destroyed`, naming `prevent_destroy`: the plan would replace or destroy a protected resource. Don't remove the guard. Find which change forces a replacement (the plan marks it `# forces replacement`), and change the code so it doesn't.
 - `Error: Inconsistent dependency lock file`: a provider changed without its lock file. Run `tofu providers lock -platform=linux_amd64 -platform=linux_arm64` in that stack's folder, and commit the lock file.

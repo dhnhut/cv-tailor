@@ -3,7 +3,7 @@ import { randomUUIDv7 } from 'node:crypto';
 // Key formats for the data table (S2-08, ADR-0006). Every key in the table is built here, so a
 // format is defined once and tested once. No AWS calls; newId() is the only function that isn't pure.
 
-// Attribute names. infra/lib/data-stack.ts writes the same names out (PK, SK, TTL).
+// Attribute names. infra/modules/data/main.tf writes the same names out (PK, SK, TTL).
 export const ATTRIBUTES = { pk: 'PK', sk: 'SK', entity: 'Entity', expiresAt: 'expiresAt' } as const;
 
 // The Entity attribute on each kind of item, so a scan or an export can be filtered by kind.

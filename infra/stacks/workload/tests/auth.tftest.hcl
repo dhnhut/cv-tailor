@@ -74,6 +74,8 @@ run "user_pool" {
       aws_cognito_user_pool.this.admin_create_user_config[0].allow_admin_create_user_only == false
       && aws_cognito_user_pool.this.auto_verified_attributes == toset(["email"])
       && aws_cognito_user_pool.this.verification_message_template[0].default_email_option == "CONFIRM_WITH_CODE"
+      && aws_cognito_user_pool.this.verification_message_template[0].email_subject == "Verify your new account"
+      && aws_cognito_user_pool.this.verification_message_template[0].email_message == "The verification code to your new account is {####}"
       && aws_cognito_user_pool.this.user_attribute_update_settings[0].attributes_require_verification_before_update == toset(["email"])
       && aws_cognito_user_pool.this.email_configuration[0].email_sending_account == "COGNITO_DEFAULT"
     )

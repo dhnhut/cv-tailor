@@ -17,7 +17,7 @@ from cv_tailor_agents.ai_guard.errors import AiCallsDisabled
 if TYPE_CHECKING:
     from types_boto3_ssm import SSMClient
 
-# Created by infra/lib/kill-switch-stack.ts (KILL_SWITCH_PARAMETER).
+# Created by infra/modules/kill-switch/main.tf. A test there checks that this name matches.
 PARAMETER_NAME = "/cv-tailor/ai-calls"
 ENABLED = "enabled"
 CACHE_SECONDS = 30.0

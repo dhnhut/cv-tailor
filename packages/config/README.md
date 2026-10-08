@@ -74,14 +74,14 @@ The threshold is checked per package against the package's total, not per file. 
 
 ### What is measured
 
-| Package              | Measured (`include`)                 | Not measured, and why                                                                                                                   |
-| -------------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/api`           | `src/**/*.ts`                        | None                                                                                                                                    |
-| `apps/web`           | `src/**/*.{ts,tsx}`                  | None. The entry point `main.tsx` has its own test (`test/main.test.tsx`).                                                               |
-| `infra`              | `bin/**`, `lib/**`, `config/**` (TS) | None. `bin/infra.ts` calls `createApp()` in `lib/app.ts` and has a smoke test (`test/bin.test.ts`).                                     |
-| `packages/contracts` | `src/**/*.ts`                        | `scripts/generate.ts`: build tooling. CI runs it in `pnpm run contracts:check` and fails if its output changes.                         |
-| `packages/config`    | Not gated                            | No runtime code, only tool config. Every other package's lint, typecheck, and test runs use it.                                         |
-| `services/agents`    | `cv_tailor_agents` (pytest-cov)      | `cv_tailor_agents/contracts/*`: generated from the Zod contracts. See [services/agents](../../services/agents/README.md#test-coverage). |
+| Package              | Measured (`include`)            | Not measured, and why                                                                                                                                                  |
+| -------------------- | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api`           | `src/**/*.ts`                   | None                                                                                                                                                                   |
+| `apps/web`           | `src/**/*.{ts,tsx}`             | None. The entry point `main.tsx` has its own test (`test/main.test.tsx`).                                                                                              |
+| `infra`              | `scripts/**/*.ts`               | The OpenTofu code, which `tofu test` checks instead (ADR-0013 §9). `web-config.ts`'s script entry point runs in a child process, which `test/web-config.test.ts` runs. |
+| `packages/contracts` | `src/**/*.ts`                   | `scripts/generate.ts`: build tooling. CI runs it in `pnpm run contracts:check` and fails if its output changes.                                                        |
+| `packages/config`    | Not gated                       | No runtime code, only tool config. Every other package's lint, typecheck, and test runs use it.                                                                        |
+| `services/agents`    | `cv_tailor_agents` (pytest-cov) | `cv_tailor_agents/contracts/*`: generated from the Zod contracts. See [services/agents](../../services/agents/README.md#test-coverage).                                |
 
 Test files, test helpers, and `*.config.ts` files are tooling, not shipped code, so `include` leaves them out. Generated contracts are the only shipped code that is excluded.
 

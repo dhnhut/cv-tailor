@@ -55,7 +55,7 @@ const allowedOrigin = requiredEnv('ALLOWED_ORIGIN');
 const tableName = requiredEnv('TABLE_NAME');
 
 // Two calls at worst (Get, then Put), each with one retry, fit inside the Lambda's 10-second
-// timeout (api-stack.ts). The client's timeouts are in aws.ts.
+// timeout (infra/modules/api/main.tf). The client's timeouts are in aws.ts.
 const client = dynamoClient();
 
 export const handler = createHandler({

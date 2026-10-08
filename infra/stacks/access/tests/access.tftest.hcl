@@ -86,7 +86,7 @@ run "deploy_role" {
       "WorkloadRoles", "PassWorkloadRoles", "ApiGatewayServiceRole",
       "DenyChangingCiAccess", "DenyRolesWithoutBoundary", "DenyRemovingBoundary", "DenyBudgets", "DenyKillSwitchWrites",
       "DenyHostedZones", "DenyOtherState", "DenyStateBucketChanges", "DenyTableData", "DenyDocuments", "DenyUserAccounts",
-      "DenyLogReads", "DenyModelCalls",
+      "DenyLogReads", "DenyInvokingFunctions", "DenyModelCalls",
     ]
     error_message = "A statement was added, removed, or reordered. Update this test only after reviewing the change to CI's access."
   }
@@ -219,6 +219,16 @@ run "deploy_role" {
       DenyDocuments = "arn:aws:s3:::cv-tailor-dev-documents-111111111111/*"
     }
     error_message = "CI must not read or change users' table items or documents."
+  }
+
+  assert {
+    condition = one([for s in jsondecode(aws_iam_role_policy.deploy.policy).Statement : s if s.Sid == "DenyInvokingFunctions"]) == {
+      Sid      = "DenyInvokingFunctions"
+      Effect   = "Deny"
+      Action   = ["lambda:InvokeAsync", "lambda:InvokeFunction", "lambda:InvokeFunctionUrl"]
+      Resource = "*"
+    }
+    error_message = "CI must not run a function: a forged event could reach user data through it."
   }
 
   assert {

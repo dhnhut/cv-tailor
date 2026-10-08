@@ -124,6 +124,40 @@ run "api" {
     error_message = "api.<host> points at the API's domain."
   }
 
+  # The handlers read these variables by name (apps/api), and the deploy role manages only
+  # cv-tailor-<env>-* functions.
+  assert {
+    condition = { for name, fn in local.functions : name => { timeout = fn.timeout, environment = fn.environment } } == {
+      me = {
+        timeout     = 10
+        environment = { TABLE_NAME = "cv-tailor-dev-data", ALLOWED_ORIGIN = "https://dev.cv.ikiwii.com" }
+      }
+      create-document = {
+        timeout     = 20
+        environment = { TABLE_NAME = "cv-tailor-dev-data", BUCKET_NAME = "cv-tailor-dev-documents-111111111111", ALLOWED_ORIGIN = "https://dev.cv.ikiwii.com" }
+      }
+      list-documents = {
+        timeout     = 20
+        environment = { TABLE_NAME = "cv-tailor-dev-data", BUCKET_NAME = "cv-tailor-dev-documents-111111111111", ALLOWED_ORIGIN = "https://dev.cv.ikiwii.com" }
+      }
+      delete-document = {
+        timeout     = 15
+        environment = { TABLE_NAME = "cv-tailor-dev-data", BUCKET_NAME = "cv-tailor-dev-documents-111111111111", ALLOWED_ORIGIN = "https://dev.cv.ikiwii.com" }
+      }
+    }
+    error_message = "Each function's timeout and environment variables must match what its handler expects."
+  }
+
+  assert {
+    condition = { for name, fn in module.functions : name => fn.function_name } == {
+      me              = "cv-tailor-dev-me"
+      create-document = "cv-tailor-dev-create-document"
+      list-documents  = "cv-tailor-dev-list-documents"
+      delete-document = "cv-tailor-dev-delete-document"
+    }
+    error_message = "Function names must start with cv-tailor-<env>-, the only ones the deploy role may manage."
+  }
+
   # Exact match, for each Lambda: a new action or resource needs a decision. Each function gets
   # only the calls its own code makes (S3-07). The first statement is its own log group.
   assert {

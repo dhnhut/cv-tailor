@@ -69,7 +69,7 @@ describe('limits (KB-03, KB-06)', () => {
     expect(DOCUMENT_TYPES).toEqual(['txt', 'md', 'html', 'doc', 'docx', 'pdf']);
   });
 
-  // infra's IAM resources are built from this prefix (api-stack.ts).
+  // infra's IAM resources are built from this prefix (infra/generated/contracts.json, infra/modules/api).
   test('every document key starts with kb/', () => {
     expect(DOCUMENTS_KEY_PREFIX).toBe('kb/');
   });

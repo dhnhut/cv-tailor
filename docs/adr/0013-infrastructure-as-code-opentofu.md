@@ -1,11 +1,12 @@
 # ADR-0013: Infrastructure as Code with OpenTofu
 
-| Field       | Value         |
-| ----------- | ------------- |
-| Status      | Accepted      |
-| Date        | 2026-10-07    |
-| Deciders    | Project owner |
-| Sprint item | S3-15         |
+| Field       | Value                                                                                                                                                                                                                           |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status      | Accepted                                                                                                                                                                                                                        |
+| Date        | 2026-10-07                                                                                                                                                                                                                      |
+| Deciders    | Project owner                                                                                                                                                                                                                   |
+| Sprint item | S3-15                                                                                                                                                                                                                           |
+| Amended     | 2026-10-08: the explicit denies in point 5 are listed in full, and CI may not invoke functions. The state keys don't rotate automatically, and their cost is recorded in point 4. The verification results are recorded (S3-15) |
 
 ## Context
 
@@ -138,6 +139,7 @@ infra/
 - **Locking:** native S3 locking (`use_lockfile = true`) [3].
 - **Encryption:** every stack except `bootstrap` has `encryption { key_provider "aws_kms" … method "aes_gcm" … }` for state and plan, with `enforced = true` [2]. OpenTofu then refuses to write unencrypted state. `bootstrap` creates the key, so its state can't depend on it. That state holds no secrets, only the bucket's and the key's settings, and the bucket encrypts it at rest with the same key.
 - **The KMS key:** a 30-day deletion window and `prevent_destroy`. Its key policy delegates to IAM in the same account, so access comes from IAM policies: SSO administrators and `GithubDeployRole`.
+- **Cost and rotation:** each account's key costs USD 1 a month, and the first and second rotation of a key each add USD 1 a month, whether automatic or on demand [8]. The keys don't rotate automatically: a key that only wraps data keys, as here, wears very little, so rotation is mainly for compliance rules [8], and three rotated keys would cost up to USD 9 a month against budgets of USD 5, 5, and 10. An on-demand rotation (`aws kms rotate-key-on-demand`, up to 25 per key [9]) is still possible at any time, and old key material stays available, so older state still decrypts. `trivy` rates a key without automatic rotation MEDIUM (AWS-0065), below the CI gate.
 
 ### 5. CI access (replaces ADR-0004 §4 "Permissions" and §5)
 
@@ -155,12 +157,17 @@ CloudFormation's execution role is gone, so `GithubDeployRole` calls AWS itself.
 **Explicitly denies:**
 
 - Any change to `GithubDeployRole` itself, to the boundary policy, or to the OIDC provider.
+- Creating or changing a role without the boundary, and removing a boundary.
 - `budgets:*`.
 - Writes to `/cv-tailor/ai-calls`.
 - Creating or deleting hosted zones.
-- Any other state key.
+- Any other stack's state, and changes to the state bucket's settings.
+- Reading or changing user data: table items, documents, and user accounts.
+- Reading logs, invoking functions, and calling models.
 
-**The permissions boundary** is a managed policy in the `access` stack. It is the most that any workload role can ever do, whatever its own policy says. It allows the data, storage, logging, and Bedrock actions the workload needs, and denies all IAM, Organizations, and account actions. Because of it, a change to the pipeline or the HCL can't create a role with more power than the boundary.
+These denies stop CI from reaching user data directly, or through a forged event to a function. A change to a function's code can still reach it, as with any deploy, so code is reviewed before it's merged (`AGENTS.md` §1).
+
+**The permissions boundary** is a managed policy in the `access` stack. It is the most that any workload role can ever do, whatever its own policy says. It allows only the workload's data, storage, sign-in linking, parameter, and logging actions. Everything else, such as IAM, Organizations, and account actions, is outside it. Because of it, a change to the pipeline or the HCL can't create a role with more power than the boundary.
 
 This role is broader than the CDK one, which could only hand work to CloudFormation. Point 5 is what keeps it inside the workload. Exact-match tests pin the policy, and the IAM policy simulator checks it live (see [Verification](#verification)).
 
@@ -236,6 +243,7 @@ The order and the cache rules are the same as before (S2-04).
 - The REST API, its CORS preflights, and its deployment trigger are written out in full. CDK generated them.
 - `dev` data is lost in the move.
 - `prevent_destroy` protects a resource only while its block is in the code. Deleting the block removes the guard.
+- A fixed cost of USD 1 a month per account for the state key, which CloudFormation didn't have.
 
 ### Risks and mitigations
 
@@ -252,6 +260,7 @@ The order and the cache rules are the same as before (S2-04).
 - A second person deploys: add a plan on every PR with a read-only role, and a manual approval for applies.
 - `prod` gets a workload: CI deploys `stag` and `prod` with their own roles and GitHub Environments, and `prod` gets a manual approval gate.
 - Terraform adds client-side state encryption, or the Cognito identity provider gets a write-only secret: Terraform becomes an option again.
+- A compliance rule or a review requires key rotation: turn on automatic rotation for the state keys, at USD 1 a month more for each of the first two rotations.
 
 ## Verification
 
@@ -264,6 +273,19 @@ The order and the cache rules are the same as before (S2-04).
 7. The first CI deploy after the move is green and applies no changes.
 8. No CloudFormation stack is left in any of the three accounts.
 
+### Results (S3-15, 2026-10-07 to 2026-10-08)
+
+The move ran on 2026-10-07 ([deploy runbook](../runbooks/deploy-and-rollback.md#7-move-from-cdk-once-s3-15), section 7). The AWS checks ran on 2026-10-08 from a laptop, with read-only commands.
+
+1. **Pass.** `pnpm run check` passes locally and in CI: 36 `tofu test` runs across the five stacks, and 44 vitest tests in `infra`.
+2. **Pass.** A plan of every stack in every account showed no changes, apart from the three changes this amendment makes: the state keys' rotation, the deploy role's invoke deny, and the verification email text.
+3. **Pass.** Public DNS returns the same four name servers for `dev.cv.ikiwii.com` as before the move, and both `dns` plans show no changes.
+4. **Pass.** In every account, the simulator gives `explicitDeny` for `budgets:ModifyBudget`, and `allowed` for `acm:GetCertificate`.
+5. **Pass.** The `dev` workload state in S3 has only OpenTofu's `encrypted_data`, with no `resources` or `client_secret` in plain text. Neither OpenTofu deploy log in GitHub Actions contains the Google client secret.
+6. **Pass.** `tofu.sh dev workload plan -destroy` fails on exactly the user pool, the data table, and the documents bucket.
+7. **Failed, then passed.** The first CI deploy stopped at the plan, with no change made. `GithubDeployRole` lacked `acm:GetCertificate`, which `data "aws_acm_certificate"` calls. The same plan would also have removed values AWS stores by default: the gateway responses' body and status code, and Google's endpoints in the identity provider, which could have broken Google sign-in. PR #63 added the permission and wrote the defaults out, and the next deploy applied only the new API deployment that this needed.
+8. **Pass.** No CloudFormation stack is left in any account, and neither is anything CDK made: no `cdk-*` bucket, repository, role, or SSM parameter, and no log group from the old stacks.
+
 ## Sources
 
 Accessed 2026-10-07.
@@ -275,3 +297,5 @@ Accessed 2026-10-07.
 5. terraform-provider-aws PR #48904, "Add Managed Knowledge Base support (type=MANAGED)", released in v6.56.0: <https://github.com/hashicorp/terraform-provider-aws/pull/48904>
 6. terraform-provider-aws, `aws_bedrockagent_data_source` (v6.67.0): <https://github.com/hashicorp/terraform-provider-aws/blob/v6.67.0/website/docs/r/bedrockagent_data_source.html.markdown>
 7. terraform-provider-aws resource documentation (v6.67.0): <https://github.com/hashicorp/terraform-provider-aws/tree/v6.67.0/website/docs/r>
+8. AWS KMS, Rotate AWS KMS keys (pricing and why rotate), accessed 2026-10-08: <https://docs.aws.amazon.com/kms/latest/developerguide/rotate-keys.html>
+9. AWS KMS, Perform on-demand key rotation, accessed 2026-10-08: <https://docs.aws.amazon.com/kms/latest/developerguide/rotating-keys-on-demand.html>

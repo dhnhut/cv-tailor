@@ -3,7 +3,7 @@ import { describe, expect, test } from 'vitest';
 import { dynamoProfileStore } from '../../src/data/profiles.ts';
 import { conditionFailed, expectCommands, fakeSend } from '../aws-fakes.ts';
 
-// The exact DynamoDB requests GET /me sends (S2-09). The IAM policy in infra/lib/api-stack.ts
+// The exact DynamoDB requests GET /me sends (S2-09). The IAM policy in infra/modules/api/main.tf
 // allows GetItem and PutItem only, so a new command here needs a policy change too. Inputs are
 // written out literally, so a changed key format, attribute, or condition fails here.
 

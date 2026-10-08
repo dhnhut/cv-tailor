@@ -14,8 +14,12 @@ locals {
 # OpenTofu, and a scheduled deletion waits 30 days.
 resource "aws_kms_key" "state" {
   description             = "OpenTofu state and plan encryption (ADR-0013 section 4)"
-  enable_key_rotation     = true
   deletion_window_in_days = 30
+
+  # No automatic rotation. The key only wraps data keys, so its material wears very little, and the
+  # first two rotations would each add USD 1 a month, against budgets of USD 5. Rotate on demand
+  # when needed: `aws kms rotate-key-on-demand --key-id alias/cv-tailor-tfstate` (ADR-0013 §4).
+  enable_key_rotation = false
 
   # The account's IAM policies decide who may use the key: SSO administrators and GithubDeployRole
   # (access stack). This is AWS's default key policy, written out so it's reviewed.
