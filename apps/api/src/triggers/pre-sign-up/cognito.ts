@@ -1,6 +1,6 @@
 // The Cognito calls the pre sign-up trigger makes (S2-07). One command per function and no
 // decisions: rules.ts decides, and handler.ts calls these in order. The IAM policy in
-// infra/lib/auth-stack.ts allows exactly these five actions, on this user pool only.
+// infra/modules/auth/main.tf allows exactly these five actions, on this user pool only.
 import { randomBytes } from 'node:crypto';
 import {
   AdminCreateUserCommand,

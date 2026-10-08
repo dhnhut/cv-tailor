@@ -1,5 +1,5 @@
 // The data table calls GET /me makes (S2-09). handlers/me/handler.ts calls ensureProfile once per
-// request. The IAM policy in infra/lib/api-stack.ts allows exactly GetItem and PutItem, on the
+// request. The IAM policy in infra/modules/api/main.tf allows exactly GetItem and PutItem, on the
 // data table only, so a new command here needs a policy change too.
 import {
   ConditionalCheckFailedException,

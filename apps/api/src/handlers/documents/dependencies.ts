@@ -5,7 +5,7 @@ import type { ServiceDeps } from '../../documents/service.ts';
 import { requiredEnv } from '../../env.ts';
 import { s3DocumentBucket } from '../../storage/documents-bucket.ts';
 
-// What the three document Lambdas need, built from the settings api-stack.ts gives them. Each
+// What the three document Lambdas need, built from the settings infra/modules/api gives them. Each
 // handler calls this when its module loads, so a missing setting fails the first request loudly
 // (env.ts). The environment is a parameter so a test can pass its own.
 export const documentDependencies = (

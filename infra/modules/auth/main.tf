@@ -53,6 +53,10 @@ resource "aws_cognito_user_pool" "this" {
   auto_verified_attributes = ["email"]
   verification_message_template {
     default_email_option = "CONFIRM_WITH_CODE"
+    # The text the CDK app set before S3-15. Used for the sign-up code, a resent code, an email
+    # change, and a password reset.
+    email_subject = "Verify your new account"
+    email_message = "The verification code to your new account is {####}"
   }
   user_attribute_update_settings {
     attributes_require_verification_before_update = ["email"]

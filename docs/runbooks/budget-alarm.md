@@ -24,7 +24,7 @@ What to do when an AWS Budgets alert arrives. Each environment account has one m
 | Item        | Value                                                                                                          |
 | ----------- | -------------------------------------------------------------------------------------------------------------- |
 | Budget name | `cv-tailor-<env>-monthly`. The `<env>` is the account.                                                         |
-| Amount      | USD 5 (`dev`), 5 (`stag`), 10 (`prod`) per month, from `infra/config/environments.ts`                          |
+| Amount      | USD 5 (`dev`), 5 (`stag`), 10 (`prod`) per month, from `infra/modules/settings`                                |
 | Alerts      | Actual spend above 25%, 50%, 80%, and 100%, and forecast spend above 100%                                      |
 | Spend type  | Before credits (`IncludeCredit: false`), so credits never hide real usage                                      |
 | Delay       | Budgets updates a few times a day, and cost data can be up to 24 hours late. Real spend may already be higher. |
@@ -52,6 +52,8 @@ Use `--profile cvt-prod-ro` for `prod`.
    ```
 
    Change `--granularity MONTHLY` to `DAILY` to see when the cost started.
+
+   Some costs are always there, and don't need a response. Each account's OpenTofu state key (KMS) costs USD 1 a month, plus USD 1 a month for each of its first two rotations if it's ever rotated ([ADR-0013](../adr/0013-infrastructure-as-code-opentofu.md) §4). In `dev`, the Google client secret (Secrets Manager) costs USD 0.40 a month.
 
 2. **Bedrock (near real time).** Cost Explorer is late. Token counts in CloudWatch are not:
 

@@ -3,7 +3,7 @@
 // token's signature, expiry, and scope, so these claims can be trusted.
 import type { APIGatewayProxyEvent } from 'aws-lambda';
 
-// Must match ADMIN_GROUP in infra/lib/auth-stack.ts (ADR-0009 §7).
+// Must match admin_group in infra/modules/auth/variables.tf (ADR-0009 §7).
 export const ADMIN_GROUP = 'admin';
 
 export interface Caller {

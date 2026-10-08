@@ -373,6 +373,14 @@ resource "aws_iam_role_policy" "deploy" {
         Resource = "*"
       },
       {
+        # CI never runs a function. Invoking one with a forged event, such as the document API with
+        # another user's claims, would reach user data around the denies above.
+        Sid      = "DenyInvokingFunctions"
+        Effect   = "Deny"
+        Action   = ["lambda:InvokeAsync", "lambda:InvokeFunction", "lambda:InvokeFunctionUrl"]
+        Resource = "*"
+      },
+      {
         Sid      = "DenyModelCalls"
         Effect   = "Deny"
         Action   = ["bedrock:Converse*", "bedrock:CreateProvisionedModelThroughput", "bedrock:InvokeModel*", "bedrock:Retrieve*"]

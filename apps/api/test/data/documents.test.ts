@@ -13,7 +13,7 @@ import {
 import { cancelled, conditionFailed, expectCommands, fakeSend } from '../aws-fakes.ts';
 
 // The exact DynamoDB requests the document API sends (S3-07). The IAM policies in
-// infra/lib/api-stack.ts allow only the actions these commands need, so a new command here needs a
+// infra/modules/api/main.tf allow only the actions these commands need, so a new command here needs a
 // policy change too. Inputs are written out literally, so a changed key, attribute, or condition
 // fails here.
 //

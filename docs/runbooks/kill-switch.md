@@ -12,7 +12,7 @@ The switch is the SSM parameter `/cv-tailor/ai-calls` in each environment's acco
 
 - **Timing:** the guard caches the value for 30 seconds, so a change takes effect within 30 seconds.
 - **Typos:** SSM accepts only `enabled` and `disabled` (`AllowedPattern`), so a typo fails at `put-parameter`.
-- **Starting value:** each environment starts with its value in `AI_CALLS_INITIAL` in [`infra/config/environments.ts`](../../infra/config/environments.ts). That's `enabled` in `dev`, and `disabled` in `stag` and `prod` until their first release.
+- **Starting value:** each environment starts with its value in `ai_calls_initial` in [`infra/modules/settings`](../../infra/modules/settings/main.tf). That's `enabled` in `dev`, and `disabled` in `stag` and `prod` until their first release.
 - **Coverage today:** model calls from `services/agents`. Knowledge base Retrieve calls, the API's own check, and the message users see come with Sprint 3.
 
 ## How it differs from the emergency deny SCP

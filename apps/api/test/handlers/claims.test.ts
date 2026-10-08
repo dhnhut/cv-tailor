@@ -15,7 +15,7 @@ const accessClaims = (extra: Record<string, unknown> = {}) => ({
 });
 
 // Written out, so a renamed group in either place is noticed.
-test('the admin group is named admin, as in infra/lib/auth-stack.ts', () => {
+test('the admin group is named admin, as in infra/modules/auth/variables.tf', () => {
   expect(ADMIN_GROUP).toBe('admin');
 });
 

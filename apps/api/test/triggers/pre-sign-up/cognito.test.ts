@@ -8,7 +8,7 @@ import {
 import { describe, expect, test, vi } from 'vitest';
 import { cognitoDirectory, linkedGoogleSubs } from '../../../src/triggers/pre-sign-up/cognito.ts';
 
-// The exact Cognito requests the trigger sends (S2-07). The IAM policy in infra/lib/auth-stack.ts
+// The exact Cognito requests the trigger sends (S2-07). The IAM policy in infra/modules/auth/main.tf
 // allows these five actions only, so a new command here needs a policy change too.
 
 const POOL = 'us-east-1_TestPool';

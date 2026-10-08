@@ -74,8 +74,8 @@ run "state_key" {
   command = plan
 
   assert {
-    condition     = aws_kms_key.state.enable_key_rotation && aws_kms_key.state.deletion_window_in_days == 30
-    error_message = "The key must rotate yearly, and a deletion must wait 30 days."
+    condition     = !aws_kms_key.state.enable_key_rotation && aws_kms_key.state.deletion_window_in_days == 30
+    error_message = "The key rotates on demand only (ADR-0013 §4), and a deletion must wait 30 days."
   }
 
   assert {
