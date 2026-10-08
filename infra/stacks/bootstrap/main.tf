@@ -18,7 +18,9 @@ resource "aws_kms_key" "state" {
 
   # No automatic rotation. The key only wraps data keys, so its material wears very little, and the
   # first two rotations would each add USD 1 a month, against budgets of USD 5. Rotate on demand
-  # when needed: `aws kms rotate-key-on-demand --key-id alias/cv-tailor-tfstate` (ADR-0013 §4).
+  # when needed (ADR-0013 §4). The command takes the key's ID, not its alias:
+  #   aws kms rotate-key-on-demand --key-id "$(aws kms describe-key \
+  #     --key-id alias/cv-tailor-tfstate --query KeyMetadata.KeyId --output text)"
   enable_key_rotation = false
 
   # The account's IAM policies decide who may use the key: SSO administrators and GithubDeployRole
