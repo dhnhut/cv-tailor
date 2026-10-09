@@ -22,6 +22,10 @@ Application programming interface: here, the HTTP endpoints the web app calls, s
 
 The AWS service that receives HTTP requests at `api.<host>`, checks the caller's token, and passes each request to a Lambda function.
 
+### Authorizer
+
+API Gateway's check that runs before any Lambda function. Here, a Cognito authorizer checks the access token's signature, expiry, and scope. See [08 Request flow](08-request-flow.md).
+
 ### AWS account
 
 A container for AWS resources, with its own permissions and bill. CV Tailor has one account per environment ([ADR-0004](../adr/0004-accounts-and-access.md)).
@@ -50,6 +54,10 @@ Continuous delivery (or deployment): every change merged to `main` is deployed a
 
 Continuous integration: every push is checked automatically. Here, the `check` job in `.github/workflows/ci.yml`.
 
+### Claim
+
+One field inside a token, such as `sub`, `token_use`, or `cognito:groups`. The API reads the caller's claims in `apps/api/src/handlers/claims.ts`.
+
 ### CloudFront
 
 The AWS content delivery network that serves the web app's files to browsers.
@@ -62,9 +70,17 @@ The AWS service that records every API call made in an account: who did what, an
 
 Amazon Cognito: the AWS service for sign-up and sign-in. It holds the users of CV Tailor (not of AWS) in a user pool.
 
+### Cold start
+
+The first run of a Lambda function in a fresh container. Code at the top level of a module, outside the handler, runs once then.
+
 ### Commit
 
 A saved set of changes in git, with a message. Here, every message starts with a sprint item ID, such as `S3-07`.
+
+### Condition expression
+
+A rule DynamoDB checks before a write, such as `attribute_not_exists(#pk)`. If the rule fails, nothing is written. See [06 API](06-api.md).
 
 ### Contract
 
@@ -78,9 +94,17 @@ Cross-origin resource sharing: the browser's rule about which websites may call 
 
 The share of code that tests run. Every package must stay at 80% or more, or CI fails.
 
+### Dependabot
+
+GitHub's bot that opens pull requests to update dependencies every week (`.github/dependabot.yml`).
+
 ### Dev container
 
 A Docker container with every tool the project needs, defined in `.devcontainer/`. See [03 Setup](03-setup.md).
+
+### Drift check
+
+`pnpm run contracts:check`: it generates the contracts again and fails if they differ from what is committed. See [05 Contracts](05-contracts.md).
 
 ### DynamoDB
 
@@ -94,6 +118,14 @@ A separate copy of the whole system: `dev` for development, `stag` for staging, 
 
 The tool that bundles each API Lambda function into one file (`pnpm --filter @cv-tailor/api build`).
 
+### Fail closed
+
+When unsure, refuse. The kill switch blocks AI calls unless it reads exactly `enabled`.
+
+### Fake
+
+A simple stand-in for a real dependency in a test, such as a `send` function that returns prepared answers instead of calling AWS.
+
 ### Generated file
 
 A file a program writes, which you never edit by hand. `pnpm run generate` writes them. See [04 Repo tour](04-repo-tour.md#generated-files).
@@ -101,6 +133,10 @@ A file a program writes, which you never edit by hand. `pnpm run generate` write
 ### GitHub Actions
 
 GitHub's automation service. It runs the workflows in `.github/workflows/`.
+
+### GitHub Environment
+
+A named deploy target, `dev`, with rules such as which branch may deploy to it. CI's AWS role trusts only this environment.
 
 ### Golden rule
 
@@ -117,6 +153,10 @@ A token that describes the person who signed in, such as their email address. Th
 ### Infrastructure as code
 
 Describing cloud resources in files that are reviewed, tested, and applied by a tool, instead of clicking in a console. Here, with OpenTofu in `infra/`.
+
+### Item
+
+One record in a DynamoDB table, found by its key (`PK` and `SK`).
 
 ### JSON
 
@@ -142,9 +182,17 @@ A tool that finds likely mistakes and style problems without running the code. H
 
 A file that pins the exact version of every package, so every install is the same: `pnpm-lock.yaml` and `services/agents/uv.lock`.
 
+### Log group
+
+Where CloudWatch Logs keeps one function's logs, named `/aws/lambda/<function name>`.
+
 ### MFA
 
 Multi-factor authentication: a second proof of identity, such as a code from an app, on top of a password.
+
+### Mock provider
+
+In `tofu test`, a fake AWS provider that answers without calling AWS. See [10 Infrastructure](10-infrastructure.md).
 
 ### Monorepo
 
@@ -158,9 +206,17 @@ Minimum viable product: the first release that is useful end to end ([ADR-0005](
 
 OpenID Connect: a standard way to prove an identity with a signed token. CI uses it to get short-lived AWS credentials without stored keys. Sign-in uses it too.
 
+### Open redirect
+
+A bug that lets a link send people from our site to another one, for example after sign-in. `apps/web/src/auth/return-path.ts` prevents it.
+
 ### OpenTofu
 
 The infrastructure-as-code tool this project uses (`tofu`). See [ADR-0013](../adr/0013-infrastructure-as-code-opentofu.md).
+
+### Partition key and sort key
+
+The two parts of a DynamoDB item's key. Here, `PK` is `USER#<sub>`, and `SK` says what the item is, such as `PROFILE` or `DOC#<id>`.
 
 ### Permission set
 
@@ -170,17 +226,33 @@ In IAM Identity Center, a named set of permissions that a group gets in an AWS a
 
 Proof Key for Code Exchange: a step in browser sign-in that stops a stolen sign-in code from being used by anyone else.
 
+### Plan and apply
+
+OpenTofu's two steps: `plan` shows what would change, and `apply` changes it. You never run `apply`.
+
 ### pnpm
 
 The package manager for the TypeScript packages. It also runs every package's scripts, such as `pnpm run check`.
+
+### Presigned URL
+
+A link, signed with the API's permission, that lets the browser upload one file straight to S3 for a few minutes.
 
 ### Prettier
 
 The tool that formats code and Markdown the same way for everyone. `pnpm run format` fixes formatting; CI checks it.
 
+### prevent_destroy
+
+An OpenTofu setting that makes any plan to delete a resource fail. It guards data that can't be recovered.
+
 ### Pull request
 
 A request to merge a branch into `main`, where the change is checked by CI and reviewed. Often called a PR.
+
+### Pydantic
+
+A Python library for data models that check their data. The generated contracts are Pydantic classes.
 
 ### RAG
 
@@ -210,6 +282,14 @@ Step-by-step instructions for an operations task, in [`docs/runbooks/`](../runbo
 
 Amazon Simple Storage Service: stores files ("objects") in "buckets". Here: the web app's files, candidates' documents, and OpenTofu state.
 
+### Scan
+
+A DynamoDB read of every item in a table. You never run one.
+
+### Scope
+
+A permission named in an access token. The API requires `cv-tailor-api/user`.
+
 ### SCP
 
 Service control policy: a rule in AWS Organizations that limits what any role in an account can do, such as using only `us-east-1`.
@@ -222,6 +302,10 @@ Single-page application: a web app that loads once and then changes the page wit
 
 A one-week block of planned work, with a goal and a backlog. See [`docs/sprints/`](../sprints/README.md).
 
+### SSM Parameter Store
+
+An AWS service that keeps settings by name, such as the kill switch `/cv-tailor/ai-calls`.
+
 ### SSO
 
 Single sign-on. Here, IAM Identity Center: one sign-in that gives short-lived access to AWS accounts ([account access runbook](../runbooks/account-access.md)).
@@ -230,9 +314,25 @@ Single sign-on. Here, IAM Identity Center: one sign-in that gives short-lived ac
 
 The file in which OpenTofu records what it has created, so it can compare it with the code. It's kept encrypted in S3.
 
+### StrictMode
+
+A React mode for development that runs effects twice, to show bugs early. See [07 Web](07-web.md).
+
+### Stubber
+
+botocore's test helper: it answers the AWS calls a test expects, and fails on any other call.
+
+### Sub
+
+A person's permanent user ID in Cognito, a lowercase UUID. The API knows people only by their `sub`.
+
 ### Typecheck
 
 Running the TypeScript compiler (`tsc`) or mypy to find type mistakes without running the code.
+
+### UUID v7
+
+An ID format that starts with a timestamp, so IDs sort by when they were made ([ADR-0006](../adr/0006-data-store.md)).
 
 ### uv
 
