@@ -52,6 +52,19 @@ Problems you may meet, and how to fix them. Read the whole error message first: 
 | Claude edits a file                                    | Check that `.claude/settings.local.json` is at the repository root, and that it is valid JSON. Then tell your mentor.                                                    |
 | `.claude/settings.local.json` shows up in `git status` | Your branch is older than the rule in `.gitignore`. Start your branch from an up-to-date `main`.                                                                         |
 
+## Tests in weeks 2 and 3
+
+| Symptom                                                                      | Cause and fix                                                                                                                                                |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| You want to run one test, not the whole file                                 | Add `-t` and part of the test's name: `pnpm --filter @cv-tailor/api exec vitest run test/handlers/me/handler.test.ts -t "never logs"`. For pytest, use `-k`. |
+| `uv run` says the environment is out of date                                 | Run `uv sync` in `services/agents`.                                                                                                                          |
+| `bash infra/scripts/tofu-each.sh test` fails at `init` with a download error | It needs internet the first time, to download the providers. Run it again.                                                                                   |
+| A practice change is still there after the exercise                          | Run the reset from [the practice routine](README.md#the-practice-routine) from the repository root, then `git status`.                                       |
+
+## AWS access (week 3)
+
+See [12 Explore dev: If you get stuck](12-explore-dev.md#if-you-get-stuck), and the [account access runbook](../runbooks/account-access.md#if-it-fails). Never work around an `AccessDenied`: read-only access is meant to refuse changes. Tell your mentor.
+
 ## Lessons from past sprints
 
 Every sprint review ends with "Lessons learned": real problems this project hit, and what fixed them. When something strange happens, search the sprint docs for a word from your error message, for example:

@@ -66,23 +66,21 @@ About 6 hours a day for four weeks. "LP" means a topic in [02 Learning path](02-
 | 3   | 03: the web app and your `dev` account, and the AI tutor from 00 (1.5) · [04 Repo tour](04-repo-tour.md) (2.5) · LP HTTP and JSON (2) | 6     |
 | 4   | LP TypeScript (4) · 04 exercises (2)                                                                                                  | 6     |
 | 5   | LP TypeScript narrowing (2) and Vitest (2) · week 1 check-in (1) · catch up (1)                                                       | 6     |
-| 6   | LP Zod (1) · 05 Contracts (4) · notes (1)                                                                                             | 6     |
-| 7   | LP Lambda and DynamoDB (2) · 06 API: reading and first exercises (4)                                                                  | 6     |
+| 6   | LP Zod (1) · [05 Contracts](05-contracts.md) (4) · notes (1)                                                                          | 6     |
+| 7   | LP Lambda and DynamoDB (2) · [06 API](06-api.md): reading and first exercises (4)                                                     | 6     |
 | 8   | 06 API: the other exercises and the document API (5) · notes (1)                                                                      | 6     |
-| 9   | LP React (3) and OAuth with PKCE (2) · 07 Web: reading (1)                                                                            | 6     |
+| 9   | LP React (3) and OAuth with PKCE (2) · [07 Web](07-web.md): reading (1)                                                               | 6     |
 | 10  | 07 Web: exercises (4) · week 2 check-in (1)                                                                                           | 5     |
-| 11  | 08 Request flow (4) · LP Python (2)                                                                                                   | 6     |
-| 12  | LP pytest (1) · 09 Agents (4) · catch up (1)                                                                                          | 6     |
-| 13  | LP AWS (3) and infrastructure as code (1) · 10 Infrastructure: reading (2)                                                            | 6     |
-| 14  | 10 exercises (3.5) · 11 CI/CD, with a practice pull request (2.5)                                                                     | 6     |
-| 15  | AWS sign-in with your mentor (1) · 12 Explore dev (3.5) · week 3 check-in (1)                                                         | 5.5   |
-| 16  | 13 First contribution: choose the task with your mentor (0.5) · write your plan (1.5) · start (3)                                     | 5     |
+| 11  | [08 Request flow](08-request-flow.md) (4) · LP Python (2)                                                                             | 6     |
+| 12  | LP pytest (1) · [09 Agents](09-agents.md) (4) · catch up (1)                                                                          | 6     |
+| 13  | LP AWS (3) and infrastructure as code (1) · [10 Infrastructure](10-infrastructure.md): reading (2)                                    | 6     |
+| 14  | 10 exercises (3.5) · [11 CI/CD](11-ci-cd.md), with a practice pull request (2.5)                                                      | 6     |
+| 15  | AWS sign-in with your mentor (1) · [12 Explore dev](12-explore-dev.md) (3.5) · week 3 check-in (1)                                    | 5.5   |
+| 16  | [13 First contribution](13-first-contribution.md): choose the task with your mentor (0.5) · write your plan (1.5) · start (3)         | 5     |
 | 17  | Code and tests (5) · review your own change (1)                                                                                       | 6     |
 | 18  | Open the pull request and answer the review (4) · read one or two of your mentor's merged pull requests (1)                           | 5     |
 | 19  | After the merge: check the `main` run and `dev` (1) · a pull request that improves this guide (3)                                     | 4     |
 | 20  | Teach back to your mentor (1) · retrospective (0.5) · plan the next month                                                             | 2+    |
-
-Modules 05 to 13 are being written. Until they're merged, they have no links here.
 
 If a day takes longer, that's fine. The order matters more than the dates.
 
