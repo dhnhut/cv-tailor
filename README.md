@@ -2,7 +2,7 @@
 
 An AI application that writes a tailored CV and cover letter for a specific job, using only facts from the candidate's own documents. A candidate builds a personal knowledge base once. A multi-agent system on AWS Bedrock AgentCore then writes job-specific documents in the candidate's own tone. A public chatbot lets headhunters ask about the candidate and check job fit.
 
-> **Status:** Sprint 1 (deployable foundation) is done: a merge to `main` deploys to the `dev` account. Sprint 2 (walking skeleton and sign-in) is in progress. See [`docs/sprints/`](docs/sprints/).
+> **Status:** Sprints 0 to 2 are done: a merge to `main` deploys to the `dev` account, and people can sign up and sign in at `dev.cv.ikiwii.com`. Sprint 3 (knowledge base and first agent) is in progress. See [`docs/sprints/`](docs/sprints/).
 
 ## Architecture
 
@@ -54,11 +54,14 @@ Common commands, from the repo root:
 
 ## Documentation
 
+New to the project? Start with the [onboarding guide](docs/onboarding/README.md).
+
 - [`AGENTS.md`](AGENTS.md): product scope, requirements, and architecture
 - [`docs/adr/`](docs/adr/): architecture decision records
 - [`docs/sprints/`](docs/sprints/): sprint plans and reviews
 - [`docs/cloud/service-availability.md`](docs/cloud/service-availability.md): AWS service availability report
-- [`docs/runbooks/`](docs/runbooks/): operations runbooks (account access, deploy and rollback, users and admins, Google sign-in, budget alarms)
+- [`docs/runbooks/`](docs/runbooks/): operations runbooks (account access, deploy and rollback, users and admins, Google sign-in, budget alarms, kill switch)
+- [`docs/onboarding/`](docs/onboarding/README.md): a step-by-step guide for new developers
 
 ## License
 

@@ -1,12 +1,12 @@
 # ADR-0004: AWS Account Structure and Access
 
-| Field       | Value                                                                                                                                                                                                                                     |
-| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Status      | Accepted                                                                                                                                                                                                                                  |
-| Date        | 2026-09-29                                                                                                                                                                                                                                |
-| Deciders    | Project owner                                                                                                                                                                                                                             |
-| Sprint item | S1-02                                                                                                                                                                                                                                     |
-| Amended     | 2026-10-07: the infrastructure moved from CDK to OpenTofu (S3-15). §4's permissions and §5 are superseded by [ADR-0013](0013-infrastructure-as-code-opentofu.md) §4–5, and the emergency deny SCP no longer exempts a CloudFormation role |
+| Field       | Value                                                                                                                                                                                                                                                                                                                                                                          |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Status      | Accepted                                                                                                                                                                                                                                                                                                                                                                       |
+| Date        | 2026-09-29                                                                                                                                                                                                                                                                                                                                                                     |
+| Deciders    | Project owner                                                                                                                                                                                                                                                                                                                                                                  |
+| Sprint item | S1-02                                                                                                                                                                                                                                                                                                                                                                          |
+| Amended     | 2026-10-07: the infrastructure moved from CDK to OpenTofu (S3-15). §4's permissions and §5 are superseded by [ADR-0013](0013-infrastructure-as-code-opentofu.md) §4–5, and the emergency deny SCP no longer exempts a CloudFormation role; 2026-10-09: a second person joined, so MFA is always-on, and a `DevReadOnly` group gives read-only access to `dev` only (§3, S3-16) |
 
 ## Context
 
@@ -113,7 +113,7 @@ Rules:
 
 ### 3. Human access: IAM Identity Center
 
-- IAM Identity Center is enabled in `us-east-1`, in the management account. It uses its own identity store, and MFA is required. MFA is context-aware: it is asked for when the device, browser, or location changes. This fits a single owner. MFA switches to always-on when a second person joins.
+- IAM Identity Center is enabled in `us-east-1`, in the management account. It uses its own identity store, and MFA is required at every sign-in (always-on). Until a second person joined (S3-16), MFA was context-aware, asked for only when the device, browser, or location changed, which fit a single owner.
 - Permission sets:
 
   | Permission set        | AWS managed policy    | Session duration |
@@ -121,7 +121,17 @@ Rules:
   | `AdministratorAccess` | `AdministratorAccess` | 1 hour           |
   | `ReadOnlyAccess`      | `ReadOnlyAccess`      | 4 hours          |
 
-- Local AWS CLI profiles: `cvt-dev`, `cvt-stag`, `cvt-prod`, and `org-mgmt`. Credentials come from `aws sso login` and expire with the session.
+- Groups. Access is assigned to a group, never to a user, so adding or removing a person is one membership change ([account access runbook](../runbooks/account-access.md) §3–4):
+
+  | Group            | Members                                          | Assignments                                                 |
+  | ---------------- | ------------------------------------------------ | ----------------------------------------------------------- |
+  | `Administrators` | The owner                                        | `AdministratorAccess` and `ReadOnlyAccess` on every account |
+  | `DevReadOnly`    | Team members who are learning the system (S3-16) | `ReadOnlyAccess` on `cv-tailor-dev` only                    |
+
+- **`DevReadOnly` reuses `ReadOnlyAccess`.** Identity Center creates one IAM role per permission set in each account, so its members sign in to the same role in `dev` as the owner's read-only sessions. CloudTrail tells the sessions apart by user name, and a change to the permission set changes both groups.
+- **Read-only still reads data.** `ReadOnlyAccess` can read table items, objects in the documents bucket, log events, and the user pool's users. It can't decrypt the OpenTofu state or read secrets, so it can't run a plan. This is acceptable because `dev` holds only test data: real personal data never goes into `dev`. Members read only their own items, by key.
+- **Why not `ViewOnlyAccess`:** it hides the data, but it also hides log events, Lambda settings, and SSM parameters, which a learner needs to follow a request through the system, and it still lists the user pool's users.
+- Local AWS CLI profiles: `cvt-dev`, `cvt-dev-ro`, `cvt-stag`, `cvt-prod`, and `org-mgmt`. Credentials come from `aws sso login` and expire with the session.
 - No IAM users and no access keys, in any account.
 - **Why not IAM users:** the alternative was an IAM user in the management account that assumes `OrganizationAccountAccessRole` in each member account. That role is admin-only, so read-only access would need a role created by hand in every account. The identity would also live in the management account, and the work grows with every new account. Identity Center is free and is set up once.
 
@@ -200,7 +210,8 @@ AWS allows at most 5 SCPs per target, and `FullAWSAccess` counts as one. Stateme
 
 - **Prod-only SCPs are added:** `stag` should run under the same rules to be a faithful rehearsal of `prod`. Move it into `Prod`, or into its own OU.
 - **`dev` needs looser rules than `stag`,** for example for experiments: add a `Sandbox` OU.
-- **More than about 10 accounts, or a second person joins:** consider Control Tower, or managing the Organization as code, and switch Identity Center MFA to always-on.
+- **More than about 10 accounts, or more than a few people:** consider Control Tower, or managing the Organization and Identity Center as code. When the second person joined (S3-16), MFA became always-on and Identity Center stayed manual, because one read-only member is one runbook procedure.
+- **Someone other than the owner merges to `main`:** every merge deploys `dev`, so that person deploys, and [ADR-0013](0013-infrastructure-as-code-opentofu.md)'s rule for a second person who deploys holds: a plan on every PR, and a manual approval for applies. Until then, only the owner merges.
 - **`prod` gets real users:** add prod-only SCPs and a manual approval gate on the `prod` GitHub Environment, and review `GithubDeployRole`'s policy and the workload boundary for `prod`.
 - **Identity Center access is proven in every account:** restrict or remove `OrganizationAccountAccessRole`, keeping `sts:AssumeRoot` and the management account as the break-glass path.
 - **Identity Center needs day-to-day administration:** delegate it to a member account, so the management account is used even less.
@@ -214,3 +225,4 @@ AWS allows at most 5 SCPs per target, and `FullAWSAccess` counts as one. Stateme
 5. `aws dynamodb list-tables --region ap-southeast-2 --profile cvt-dev` is denied by the SCP (`aws s3 ls` is not a valid check, because `s3:ListAllMyBuckets` is a global action), Bedrock `converse` calls through a `us.` and a `global.` inference profile succeed in `us-east-1`, and the `global.` call is denied when started in `eu-west-1`.
 6. `aws iam get-role --role-name GithubDeployRole --profile cvt-dev` shows the exact `aud` and `sub` conditions.
 7. `aws cloudtrail describe-trails --profile org-mgmt` shows `IsOrganizationTrail: true`, and its `S3BucketName` is the bucket in `log-archive`.
+8. With the `cvt-dev-ro` profile, `aws sts get-caller-identity` shows `AWSReservedSSO_ReadOnlyAccess_` and the `dev` account, and `aws ec2 create-key-pair --key-name read-only-check --dry-run` is denied with `UnauthorizedOperation` ([account access runbook](../runbooks/account-access.md) §4.4).
