@@ -36,6 +36,7 @@ For every step:
 - Every acceptance criterion in the sprint doc is met and verified.
 - New decisions are recorded as ADRs, and `AGENTS.md` is updated.
 - Tests are included for new code. The coverage target is 80% once coverage gates are enabled.
+- If a change affects setup, commands, or how a request flows, the [onboarding guide](../onboarding/README.md) is updated.
 - The sprint review section is filled in.
 
 ## Sprint doc template

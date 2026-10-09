@@ -31,6 +31,7 @@
         "Anthropic.claude-code"
       ],
       "settings": {
+        "terminal.integrated.defaultProfile.linux": "zsh",
         "editor.formatOnSave": true,
         "[typescript][typescriptreact][javascript][json]": {
           "editor.defaultFormatter": "esbenp.prettier-vscode"

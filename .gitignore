@@ -1,5 +1,8 @@
 # Agents
 CLAUDE.md
+# Personal Claude Code settings, such as the onboarding tutor setup (S3-16). Listed here, not only in
+# git's global excludes, because Prettier reads .gitignore.
+.claude/settings.local.json
 
 # Project files
 .turbo/
