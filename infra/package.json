@@ -13,9 +13,9 @@
     "@cv-tailor/config": "workspace:*",
     "@cv-tailor/contracts": "workspace:*",
     "@types/node": "^24.19.0",
-    "@vitest/coverage-v8": "5.0.2",
-    "eslint": "^10.11.0",
+    "@vitest/coverage-v8": "5.0.3",
+    "eslint": "^10.12.0",
     "typescript": "~6.0.3",
-    "vitest": "^5.0.2"
+    "vitest": "^5.0.3"
   }
 }
