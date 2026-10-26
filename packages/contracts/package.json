@@ -14,15 +14,15 @@
     "generate": "node scripts/generate.ts && prettier --write schemas ../../infra/generated"
   },
   "dependencies": {
-    "zod": "^4.6.5"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@cv-tailor/config": "workspace:*",
     "@types/node": "^24.19.0",
-    "@vitest/coverage-v8": "5.0.2",
-    "eslint": "^10.11.0",
-    "prettier": "^3.9.9",
+    "@vitest/coverage-v8": "5.0.5",
+    "eslint": "^10.13.0",
+    "prettier": "^3.9.10",
     "typescript": "~6.0.3",
-    "vitest": "^5.0.2"
+    "vitest": "^5.0.5"
   }
 }
